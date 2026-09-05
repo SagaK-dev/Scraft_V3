@@ -1,64 +1,68 @@
-# Phase 2 Review
+# Phase 3 Review
 
 ## Scope
 
-Phase 2 adds the voxel data/rendering/interaction foundation on top of Phase 1. Terrain is intentionally a fixed 5x5 chunk test area; seeded generation and streaming remain Phase 3 work.
+Phase 3 replaces the fixed Phase 2 test area with deterministic seeded terrain and player-following chunk streaming while preserving Phase 2 raycast, break/place and remeshing behavior.
 
 ## Implemented
 
-- Block / BlockRegistry with stable numeric IDs, hardness, solid/opaque/placeable flags
-- 16x256x16 chunks using `Uint16Array`
-- world/chunk/local coordinate conversion including negative X/Z and Y range -64..191
-- ChunkManager with safe unloaded-chunk behavior and dirty tracking
-- chunk-level mesh generation with hidden-face culling
-- neighbor-chunk lookup at chunk borders
-- old BufferGeometry disposal before remesh
-- voxel DDA raycast
-- reusable selection outline
-- hold-to-break with per-block hardness and target-change reset
-- right-click placement
-- player-AABB placement rejection
-- adjacent-chunk remesh on border edits
+- string seed -> deterministic uint32 hash
+- seeded 2D value noise
+- fBM and ridged fBM
+- domain-warped terrain sampling
+- grass / sand / exposed-stone surface selection
+- hills and mountain ranges with bounded world height
+- deterministic `WorldGenerator.generateChunk(chunkX, chunkZ)`
+- URL query seed selection via `?seed=...`
+- render-distance target planning
+- nearest-first asynchronous chunk generation queue
+- player chunk tracking including negative coordinates
+- unload hysteresis padding
+- dirty-neighbor remeshing when chunks enter/leave the loaded set
+- session-local block edit cache reapplied after unload/regeneration
+- generation retry with bounded failure count
+- F3 seed / render distance / loaded / pending / runtime-edit diagnostics
 
 ## Review findings and fixes
 
-- **Node test incompatibility**: strip-only TypeScript cannot execute constructor parameter properties; pure voxel test modules were kept strip-compatible.
-- **Transparent internal faces**: equal transparent block IDs now cull their shared face instead of generating duplicate interior geometry.
-- **Break/place same-frame race**: a right-click edge is consumed before break completion and ignored if the target is destroyed that frame, preventing placement against a stale hit.
-- **Break target identity**: break progress keys include block ID as well as XYZ, so replacing a block at the same coordinate resets progress.
-- **Chunk-border mesh invalidation**: edits at local X/Z 0 or 15 dirty the corresponding loaded neighbor.
-- **Unloaded writes**: ChunkManager refuses writes into missing chunks rather than inventing partial world data.
-- **Geometry lifetime**: every replaced chunk geometry is disposed before removal.
+- **Stale queue priority after moving**: pending targets are rebuilt whenever the player changes chunk or Render Distance, so nearest-first ordering always uses the current center.
+- **Transient generation failure could become permanent**: failed jobs now retry up to two times before reporting an error.
+- **Retry-state growth**: retry state is cleared when the stream plan changes and after successful generation.
+- **Unloaded player edits would disappear**: break/place operations are stored in `WorldEditStore` and reapplied when a deterministic chunk is regenerated.
+- **Chunk-border visuals during streaming**: `ChunkManager.add/remove` dirty adjacent chunks so exposed boundary faces are rebuilt when neighbors appear or disappear.
+- **Spawn vs Phase 1 floor collision**: the inner spawn region is blended toward Y=-1 until Phase 4 replaces the temporary Y=0 floor clamp with real voxel collision.
+- **Main-thread burst risk**: Phase 3 generates one chunk per scheduled task and yields between jobs. Web Worker terrain/meshing remains a Phase 10 optimization boundary.
 
 ## Automated verification
 
-27 tests currently pass locally. Phase 2 coverage includes:
+40 tests pass locally: the existing 27 Phase 1/2 tests plus 13 Phase 3 tests covering:
 
-- required BlockRegistry definitions and duplicate-ID rejection
-- Uint16 chunk capacity
-- full world/local Y conversion range
-- negative-coordinate read/write
-- unloaded-chunk write rejection
-- boundary dirty propagation
-- 6-face single voxel mesh
-- same-chunk hidden-face culling
-- cross-chunk hidden-face culling
-- transparent-neighbor behavior
-- positive and negative DDA raycast hit
-- max-distance raycast miss
-- player AABB placement overlap
-- break duration completion and target reset
+- seed hashing determinism
+- seeded noise determinism and bounds
+- query-string seed parsing
+- identical terrain from identical seeds
+- different terrain from different seeds
+- spawn flattening
+- deterministic chunk voxel content
+- generated surface/depth material correctness
+- Render Distance target planning
+- asynchronous nearest-first generation
+- negative player/chunk coordinates
+- moving-center unload/reload behavior
+- runtime edit reapplication
+- transient generation failure retry
 
-The original 10 Phase 1 tests remain in the same suite.
+CI additionally runs dependency installation, strict TypeScript checking, all tests, Vite production build and high-severity npm audit.
 
 ## Known limitations
 
-- Browser/GPU interaction and real FPS still require an actual browser run.
-- The Phase 2 world is a fixed 25-chunk flat test area. Phase 3 owns deterministic seed generation, load/unload and render-distance streaming.
-- Player movement still uses the Phase 1 flat-floor clamp. Full voxel AABB movement collision, step handling and anti-tunneling are Phase 4.
-- Phase 2 uses original vertex colors rather than a texture atlas. Atlas-backed block textures are an upcoming rendering extension; no Minecraft assets are used.
-- Leaves/glass have non-opaque culling semantics but are rendered by the shared opaque material in this phase; a transparent render pass belongs to later rendering work.
+- Phase 3 async generation is cooperative event-loop scheduling, not a Web Worker. Each chunk generation still uses the main JS thread for that individual job; Worker terrain/meshing is planned for Phase 10.
+- Full Voxel AABB player collision is Phase 4. Away from the flattened spawn area, the temporary Phase 1 floor clamp can visually disagree with generated terrain height.
+- Biomes, caves, ore veins, trees/plants, water and lighting remain Phase 8 work.
+- Runtime edits survive unload/reload only for the current page session. IndexedDB persistence is Phase 9.
+- Render Distance 16-24 is accepted but has not yet received Phase 10 memory/FPS tuning; the default remains 8.
+- Texture Atlas and transparent render passes are not part of this phase.
 
-## Phase 3 readiness
+## Phase 4 readiness
 
-World data, meshing and interaction are separated from `Game`. Chunk creation can therefore be replaced by a deterministic generator and streaming queue without changing raycast/break/place semantics.
+World access now has a stable loaded-chunk boundary and deterministic block queries. Phase 4 can replace the temporary floor clamp with voxel AABB collision without changing world generation or stream ownership.

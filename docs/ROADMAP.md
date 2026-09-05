@@ -8,9 +8,9 @@ Three.js / WebGL2、FPS camera、InputManager、fixed timestep、PlayerControlle
 
 Block/BlockRegistry、Chunk/ChunkManager、Uint16Array voxel storage、visible-face meshing、chunk-border neighbor lookup、voxel raycast、selection outline、hold-to-break、right-click placement、player-overlap prevention、neighbor remeshを実装済み。
 
-## Phase 3 — World generation
+## Phase 3 — World generation ✅
 
-Seeded noise、terrain、deterministic generation、load/unload、render-distance queue、chunk streaming。
+Seeded Value Noise / fBM / Ridged Noise / Domain Warp、決定的terrain生成、player-follow load/unload、Render Distance、nearest-first非同期生成キュー、runtime edit再適用を実装済み。
 
 ## Phase 4 — Player physics
 
@@ -38,7 +38,7 @@ IndexedDB world list、seed+delta save、player/inventory/chest/time save、load
 
 ## Phase 10 — Optimization
 
-Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning。
+Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning.
 
 ## Completion rule for every phase
 

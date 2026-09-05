@@ -25,7 +25,7 @@ export class HUD {
       <div class="overlay">
         <section class="menu-panel" aria-label="Game menu">
           <h1>Scraft V3</h1>
-          <p class="subtitle">Phase 2 — Voxel chunks and interaction</p>
+          <p class="subtitle">Phase 3 — Seeded terrain and chunk streaming</p>
           <button class="primary" data-action="start">ゲーム開始 / 再開</button>
           <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / 左長押し 破壊 / 右クリック Dirt設置 / F3 デバッグ / Esc 一時停止</div>
           <details>

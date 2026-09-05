@@ -2,30 +2,68 @@ import * as THREE from 'three';
 import { BlockIds, createDefaultBlockRegistry, type BlockRegistry } from '../blocks/BlockRegistry';
 import type { AABB } from '../player/aabb';
 import { intersectsUnitBlock } from '../player/aabb';
-import { Chunk } from './Chunk';
+import { ChunkStreamer } from './ChunkStreamer';
 import { ChunkManager, chunkKey } from './ChunkManager';
 import { buildChunkMeshData } from './ChunkMesher';
-import { CHUNK_MIN_Y, CHUNK_SIZE, worldYToLocal } from './coordinates';
+import { CHUNK_SIZE } from './coordinates';
 import { raycastVoxels, type Vec3Like, type VoxelHit } from './VoxelRaycast';
+import { WorldEditStore } from './WorldEdits';
+import { WorldGenerator } from './WorldGenerator';
+import { DEFAULT_WORLD_SEED, sanitizeWorldSeed } from './WorldSeed';
 
 const INTERACTION_DISTANCE = 6;
+
+export interface VoxelWorldOptions {
+  readonly seed?: string;
+  readonly onGenerationError?: (message: string) => void;
+}
 
 export class VoxelWorld {
   readonly blocks: BlockRegistry;
   readonly chunks = new ChunkManager();
+  readonly seed: string;
   private readonly root = new THREE.Group();
   private readonly meshes = new Map<string, THREE.Mesh>();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly outline: THREE.LineSegments;
+  private readonly edits = new WorldEditStore();
+  private readonly generator: WorldGenerator;
+  private readonly streamer: ChunkStreamer;
 
-  constructor(private readonly scene: THREE.Scene, blocks = createDefaultBlockRegistry()) {
+  constructor(
+    private readonly scene: THREE.Scene,
+    options: VoxelWorldOptions = {},
+    blocks = createDefaultBlockRegistry(),
+  ) {
     this.blocks = blocks;
+    this.seed = sanitizeWorldSeed(options.seed ?? DEFAULT_WORLD_SEED);
+    this.generator = new WorldGenerator(this.seed);
     this.root.name = 'voxel-world';
     scene.add(this.root);
     this.outline = this.createOutline();
     scene.add(this.outline);
-    this.generatePhaseTwoArea(2);
-    this.rebuildDirtyMeshes();
+
+    this.streamer = new ChunkStreamer(
+      this.chunks,
+      (chunkX, chunkZ) => {
+        const chunk = this.generator.generateChunk(chunkX, chunkZ);
+        this.edits.applyToChunk(chunk);
+        return chunk;
+      },
+      {
+        chunksPerSlice: 1,
+        unloadPadding: 2,
+        onChunksChanged: () => this.rebuildDirtyMeshes(),
+        onError: error => {
+          const message = error instanceof Error ? error.message : 'Unknown terrain generation error.';
+          options.onGenerationError?.(`チャンク生成に失敗しました: ${message}`);
+        },
+      },
+    );
+  }
+
+  updateStreaming(worldX: number, worldZ: number, renderDistance: number): void {
+    this.streamer.update(worldX, worldZ, renderDistance);
   }
 
   raycast(origin: Vec3Like, direction: Vec3Like, maxDistance = INTERACTION_DISTANCE): VoxelHit | null {
@@ -35,7 +73,10 @@ export class VoxelWorld {
   breakBlock(hit: VoxelHit): boolean {
     if (this.blocks.isAir(hit.blockId)) return false;
     const result = this.chunks.setBlock(hit.x, hit.y, hit.z, BlockIds.AIR);
-    if (result.changed) this.rebuildDirtyMeshes();
+    if (result.changed) {
+      this.edits.record(hit.x, hit.y, hit.z, BlockIds.AIR);
+      this.rebuildDirtyMeshes();
+    }
     return result.changed;
   }
 
@@ -48,7 +89,10 @@ export class VoxelWorld {
     if (this.chunks.getBlock(x, y, z) !== BlockIds.AIR) return false;
     if (intersectsUnitBlock(playerBounds, x, y, z)) return false;
     const result = this.chunks.setBlock(x, y, z, blockId);
-    if (result.changed) this.rebuildDirtyMeshes();
+    if (result.changed) {
+      this.edits.record(x, y, z, blockId);
+      this.rebuildDirtyMeshes();
+    }
     return result.changed;
   }
 
@@ -99,6 +143,7 @@ export class VoxelWorld {
   }
 
   dispose(): void {
+    this.streamer.dispose();
     this.scene.remove(this.root);
     this.scene.remove(this.outline);
     for (const mesh of this.meshes.values()) mesh.geometry.dispose();
@@ -112,33 +157,12 @@ export class VoxelWorld {
     return this.chunks.size;
   }
 
-  private generatePhaseTwoArea(radius: number): void {
-    for (let chunkZ = -radius; chunkZ <= radius; chunkZ += 1) {
-      for (let chunkX = -radius; chunkX <= radius; chunkX += 1) {
-        const chunk = new Chunk(chunkX, chunkZ);
-        for (let localZ = 0; localZ < CHUNK_SIZE; localZ += 1) {
-          for (let localX = 0; localX < CHUNK_SIZE; localX += 1) {
-            chunk.set(localX, worldYToLocal(-4), localZ, BlockIds.STONE);
-            chunk.set(localX, worldYToLocal(-3), localZ, BlockIds.STONE);
-            chunk.set(localX, worldYToLocal(-2), localZ, BlockIds.DIRT);
-            chunk.set(localX, worldYToLocal(-1), localZ, BlockIds.GRASS);
-          }
-        }
-        this.chunks.add(chunk);
-      }
-    }
+  get pendingChunkCount(): number {
+    return this.streamer.pendingCount;
+  }
 
-    // Small original-color test wall near spawn so Phase 2 interactions can be verified immediately.
-    const samples = [BlockIds.STONE, BlockIds.DIRT, BlockIds.SAND, BlockIds.WOOD, BlockIds.LEAVES];
-    for (let i = 0; i < samples.length; i += 1) {
-      const id = samples[i];
-      if (id === undefined) continue;
-      this.chunks.setBlock(i - 2, 0, 11, id);
-      this.chunks.setBlock(i - 2, 1, 11, id);
-    }
-
-    if (CHUNK_MIN_Y >= 0) throw new Error('Phase 2 terrain expects negative world Y support.');
-    this.chunks.markAllDirty();
+  get runtimeEditCount(): number {
+    return this.edits.size;
   }
 
   private createOutline(): THREE.LineSegments {

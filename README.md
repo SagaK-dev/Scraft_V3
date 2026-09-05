@@ -6,24 +6,31 @@ Minecraftの公式テクスチャ、音声、コード、ロゴ等は使用し�
 
 ## 現在の状態
 
-Phase 2: ボクセルシステムまで実装済みです。
+Phase 3: Seed付きワールド生成とチャンクストリーミングまで実装済みです。
 
 - Phase 1のThree.js / WebGL2 / FPS視点 / 固定60Hz更新 / 設定 / F3 / CI
-- Block / BlockRegistry
-- 16 x 256 x 16 Chunk + `Uint16Array` voxel storage
-- ChunkManagerと負数ワールド座標対応
-- 見えている面だけを生成するチャンク単位BufferGeometry
-- 隣接チャンクを考慮した面カリング
-- チャンク境界編集時の隣接再メッシュ
-- DDA方式Voxel Raycast
-- 選択ブロックのアウトライン表示
-- 左クリック長押し破壊（Block hardness対応）
-- 右クリックによるDirt設置
-- プレイヤーAABBと重なる位置への設置防止
-- Geometry再生成時の旧Geometry dispose
-- Phase 2確認用の固定25チャンク平坦ワールド
+- Phase 2のBlock / Chunk / Uint16Array / meshing / Raycast / break / place
+- 文字列Seedを32bit値へ決定的に変換
+- Seeded Value Noise / fBM / Ridged Noise / Domain Warp
+- 草地・砂地・岩肌を含む丘陵〜山岳の自然地形
+- 同じSeed + 同じ座標 = 同じチャンクの決定的生成
+- プレイヤーのチャンク移動に追従するロード / アンロード
+- Render Distance設定を実際のストリーミング半径へ反映
+- 近いチャンクを優先する非同期生成キュー
+- アンロードの境界揺れを抑えるhysteresis padding
+- チャンク生成失敗の制限付き再試行
+- チャンクアンロード後もセッション中の破壊・設置差分を再適用
+- F3にSeed / Render Distance / loaded / pending / runtime editsを表示
 
-Phase 3でSeed付き地形生成とチャンクストリーミングを追加します。プレイヤーとボクセルの本格的な衝突解決はPhase 4です。
+SeedはURLクエリで変更できます。
+
+```text
+?seed=my-world
+```
+
+例: `http://localhost:5173/?seed=mountain-test`
+
+Phase 4ではプレイヤーの本格的なVoxel AABB衝突、段差、落下、壁抜け対策を追加します。
 
 ## 開発
 

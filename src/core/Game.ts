@@ -6,6 +6,7 @@ import { BlockBreaker } from '../world/BlockBreaker';
 import type { VoxelHit } from '../world/VoxelRaycast';
 import { VoxelWorld } from '../world/VoxelWorld';
 import { splitCoordinate } from '../world/coordinates';
+import { resolveWorldSeed } from '../world/WorldSeed';
 import { FixedStep } from './FixedStep';
 import { InputManager } from './InputManager';
 import { Renderer } from './Renderer';
@@ -40,7 +41,11 @@ export class Game {
         this.contextLost = true;
         this.hud.fatal('描画接続が失われました。ページを再読み込みしてください。');
       });
-      this.world = new VoxelWorld(this.renderer.scene);
+      this.world = new VoxelWorld(this.renderer.scene, {
+        seed: resolveWorldSeed(),
+        onGenerationError: message => this.hud.showMessage(message),
+      });
+      this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     } catch (error) {
       this.hud.fatal(error instanceof Error ? error.message : '描画を初期化できません。');
       this.hud.dispose();
@@ -76,6 +81,7 @@ export class Game {
     this.player.look(dx, dy, this.settings.sensitivity);
     const alpha = this.input.locked ? this.clock.advance(delta, dt => this.player.update(dt, this.input)) : 1;
     this.player.render(this.renderer.camera, alpha, delta, this.settings, this.input.locked);
+    this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     this.updateVoxelInteraction(delta);
     this.renderer.draw();
 
@@ -86,15 +92,18 @@ export class Game {
       const info = this.renderer.gl.info;
       const target = this.lastHit ? `${this.lastHit.x} / ${this.lastHit.y} / ${this.lastHit.z}` : 'none';
       this.hud.updateDebug([
-        'Scraft V3 / Phase 2',
+        'Scraft V3 / Phase 3',
         `FPS ${(this.statsFrames / Math.max(this.statsTime, 0.001)).toFixed(0)}`,
         `XYZ ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
         `Chunk XZ ${splitCoordinate(p.x).chunk} / ${splitCoordinate(p.z).chunk}`,
+        `Seed ${this.world.seed}`,
+        `Render distance ${this.settings.renderDistance}`,
+        `Chunks ${this.world.loadedChunkCount} loaded / ${this.world.pendingChunkCount} pending`,
+        `Runtime edits ${this.world.runtimeEditCount}`,
         `Target ${target}`,
-        `Loaded chunks ${this.world.loadedChunkCount}`,
         `Triangles ${info.render.triangles} | Draw calls ${info.render.calls}`,
         `GPU resources ${info.memory.geometries} geometries / ${info.memory.textures} textures`,
-        'World: Phase 2 fixed test area | Terrain streaming/biomes/seed: Phase 3',
+        'World: deterministic noise terrain + asynchronous streaming',
       ].join('\n'));
       this.statsTime = 0;
       this.statsFrames = 0;

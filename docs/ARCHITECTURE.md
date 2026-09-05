@@ -2,7 +2,7 @@
 
 ## 目的
 
-長時間遊べるブラウザ向け3Dボクセル・サバイバルゲームを、段階的に実装できる構造にする。Phase 1で実行基盤、Phase 2でBlock/Chunk/Mesh/Raycast/Interactionを追加した。World/Chunk/Block/Entityの詳細はGameへ直書きせず、各サブシステムへ分離する。
+長時間遊べるブラウザ向け3Dボクセル・サバイバルゲームを、段階的に実装できる構造にする。Phase 1で実行基盤、Phase 2でBlock/Chunk/Mesh/Raycast/Interaction、Phase 3でSeeded terrainとchunk streamingを追加した。World/Chunk/Block/Entityの詳細はGameへ直書きせず、各サブシステムへ分離する。
 
 ## 技術基盤
 
@@ -26,6 +26,9 @@
 - `ChunkManager`: Chunkの所有、world block access、dirty chunk tracking
 - `ChunkMesher`: Three.js非依存のmesh data生成
 - `BlockBreaker`: 長押し破壊進行の純粋ロジック
+- `WorldGenerator`: Seeded NoiseからChunkを決定的に生成
+- `ChunkStreamer`: player chunk / Render Distanceに基づくload/unloadとnearest-first非同期生成
+- `WorldEditStore`: アンロードされたchunkへセッション内編集差分を再適用
 
 ## ゲームループ
 
@@ -41,7 +44,7 @@
 
 タブ非表示やpointer lock解除時は入力とaccumulatorをリセットし、復帰直後の大deltaを持ち越さない。
 
-## チャンク設計（Phase 2実装 / Phase 3拡張）
+## チャンク設計（Phase 3実装）
 
 標準チャンクは X=16, Z=16, Y=256。内部ボクセルは`Uint16Array(16*256*16)`を基本とする。Block IDは0をAIRとし、BlockRegistryから属性を引く。
 
@@ -52,7 +55,7 @@
 - world -> chunk: `Math.floor(block / 16)`
 - world -> local: positive modulo
 - 負数座標は `%` を直接利用しない
-- Phase 2のChunk keyは `"x,z"` 文字列。Phase 3の大量ストリーミング時にpacked keyとの計測比較を行う
+- Chunk keyは `"x,z"` 文字列。Phase 10のprofilingでpacked integer/BigIntへの変更価値を計測する
 
 ## Blockデータ
 
@@ -94,11 +97,13 @@ Phase 10:
 
 Texture Atlasは共有Texture 1枚を基本とし、チャンクアンロード時に共有Textureをdisposeしない。
 
-## ワールド生成（Phase 3/8）
+## ワールド生成（Phase 3実装 / Phase 8拡張）
 
-Seedから決定的に生成する。2D/3D NoiseとFBM/Domain Warpingを組み合わせるが、Noise実装はseed決定性のテストを持つ。
+Phase 3では文字列SeedをFNV-1a系32bit hashへ変換し、Seeded Value Noise、fBM、Ridged fBM、Domain Warpを組み合わせて地形高を決定する。同じSeed・同じworld座標では生成順序に依存せず同じ結果になる。
 
-地形、biome、cave、ore、vegetationを別ステージにし、後からWorkerへ移動できる純粋データ処理に寄せる。
+`WorldGenerator`はThree.jsへ依存せず`Chunk`だけを返す純粋データ境界に寄せる。`ChunkStreamer`は現在位置のchunkとRender Distanceからtargetを作り、中心から近い順に1chunkずつevent loopへyieldしながら生成する。load/unload時は隣接meshをdirty化し、unload paddingで境界往復時のthrashを抑える。
+
+Phase 8でbiome、3D cave noise、ore、vegetation、水、lightingを別stageとして追加する。Phase 10ではterrain/meshingをWeb Workerへ移動する。
 
 ## Entity
 
@@ -139,9 +144,10 @@ UIはゲーム描画から分離。Phase 5以降Hotbar/Inventoryを追加。Audi
 - Chunk unloadでBufferGeometry.dispose
 - chunk固有materialを作らず共有
 - event listenerはdisposeで解除
-- Worker jobにはgeneration idを付け、unload済みchunkへの古い結果を破棄
+- Phase 3 queueはdesired targetを毎回検証してstale生成を破棄
+- Phase 10 Worker jobにはgeneration idを付け、unload済みchunkへの古い結果を破棄
 - Item/MobはpoolingをPhase 10で計測後に導入
 
 ## Debug
 
-F3にFPS、XYZ、chunk、biome、seed、loaded chunks、triangles、draw calls、GPU resource数を段階的に追加する。
+F3にFPS、XYZ、chunk、seed、Render Distance、loaded/pending chunks、runtime edits、triangles、draw calls、GPU resource数を表示する。BiomeはPhase 8で追加する。
