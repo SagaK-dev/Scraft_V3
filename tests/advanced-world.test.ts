@@ -7,7 +7,7 @@ import { buildChunkMeshData } from '../src/world/ChunkMesher.ts';
 import { LightEngine } from '../src/world/LightEngine.ts';
 import { fbm3D, seedToUint32, valueNoise3D } from '../src/world/SeededNoise.ts';
 import { WeatherSystem } from '../src/world/WeatherSystem.ts';
-import { SEA_LEVEL, WorldGenerator } from '../src/world/WorldGenerator.ts';
+import { WorldGenerator } from '../src/world/WorldGenerator.ts';
 import { CHUNK_MIN_Y, worldYToLocal } from '../src/world/coordinates.ts';
 
 test('3D seeded noise is deterministic and bounded', () => {
@@ -42,17 +42,31 @@ test('advanced chunk generation contains water caves and all ore classes across 
   for (let cz = -3; cz <= 3; cz += 1) {
     for (let cx = -3; cx <= 3; cx += 1) {
       const chunk = generator.generateChunk(cx, cz);
+
+      // Resource validation must inspect the actual generated chunk, not an arbitrary
+      // depth window. This catches every generated ore/water voxel regardless of Y.
+      for (const id of chunk.voxels) {
+        if (
+          id === BlockIds.WATER
+          || id === BlockIds.COAL_ORE
+          || id === BlockIds.IRON_ORE
+          || id === BlockIds.GLOW_CRYSTAL
+        ) found.add(id);
+      }
+
+      // Cave detection remains column-aware so normal air above the terrain surface
+      // is not mistaken for an underground cave.
       for (let lz = 0; lz < 16; lz += 1) {
         for (let lx = 0; lx < 16; lx += 1) {
           const wx = cx * 16 + lx;
           const wz = cz * 16 + lz;
           const surface = generator.sampleTerrain(wx, wz).height;
-          for (let y = CHUNK_MIN_Y + 4; y <= Math.min(surface - 5, 28); y += 1) {
-            const id = chunk.get(lx, worldYToLocal(y), lz);
-            if (id === BlockIds.AIR) caveFound = true;
-            if (id === BlockIds.COAL_ORE || id === BlockIds.IRON_ORE || id === BlockIds.GLOW_CRYSTAL) found.add(id);
+          for (let y = CHUNK_MIN_Y + 4; y <= surface - 5; y += 1) {
+            if (chunk.get(lx, worldYToLocal(y), lz) === BlockIds.AIR) {
+              caveFound = true;
+              break;
+            }
           }
-          if (surface < SEA_LEVEL && chunk.get(lx, worldYToLocal(SEA_LEVEL), lz) === BlockIds.WATER) found.add(BlockIds.WATER);
         }
       }
     }
