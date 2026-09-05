@@ -9,12 +9,24 @@ export interface ChunkMeshData {
   readonly colors: Float32Array;
   readonly indices: Uint32Array;
   readonly faceCount: number;
+  readonly opaqueIndexCount: number;
+  readonly transparentIndexCount: number;
 }
+
+export type LightSampler = (worldX: number, worldY: number, worldZ: number) => number;
 
 interface Face {
   readonly normal: readonly [number, number, number];
   readonly vertices: readonly (readonly [number, number, number])[];
   readonly shade: number;
+}
+
+interface SectionBuilder {
+  readonly positions: number[];
+  readonly normals: number[];
+  readonly colors: number[];
+  readonly indices: number[];
+  faceCount: number;
 }
 
 const FACES: readonly Face[] = [
@@ -26,12 +38,9 @@ const FACES: readonly Face[] = [
   { normal: [0, 0, -1], vertices: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]], shade: 0.78 },
 ];
 
-export function buildChunkMeshData(chunk: Chunk, chunks: ChunkManager, blocks: BlockRegistry): ChunkMeshData {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  let faceCount = 0;
+export function buildChunkMeshData(chunk: Chunk, chunks: ChunkManager, blocks: BlockRegistry, lightSampler: LightSampler = () => 1): ChunkMeshData {
+  const opaque = createSection();
+  const transparent = createSection();
 
   if (!chunk.empty) {
     for (let localY = chunk.minFilledY; localY <= chunk.maxFilledY; localY += 1) {
@@ -43,6 +52,7 @@ export function buildChunkMeshData(chunk: Chunk, chunks: ChunkManager, blocks: B
           const block = blocks.get(blockId);
           const worldX = chunk.x * CHUNK_SIZE + localX;
           const worldZ = chunk.z * CHUNK_SIZE + localZ;
+          const section = block.translucent ? transparent : opaque;
 
           for (const face of FACES) {
             const nx = worldX + face.normal[0];
@@ -50,29 +60,47 @@ export function buildChunkMeshData(chunk: Chunk, chunks: ChunkManager, blocks: B
             const nz = worldZ + face.normal[2];
             const neighborId = chunks.getBlock(nx, ny, nz);
             if (!blocks.isAir(neighborId) && (neighborId === blockId || blocks.get(neighborId).opaque)) continue;
-
-            const base = positions.length / 3;
-            const rgb = shadedRgb(block.color, face.shade);
-            for (const vertex of face.vertices) {
-              positions.push(localX + vertex[0], worldY + vertex[1], localZ + vertex[2]);
-              normals.push(face.normal[0], face.normal[1], face.normal[2]);
-              colors.push(rgb[0], rgb[1], rgb[2]);
-            }
-            indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
-            faceCount += 1;
+            appendFace(section, localX, worldY, localZ, block.color, face, lightSampler(nx, ny, nz));
           }
         }
       }
     }
   }
 
+  const opaqueVertices = opaque.positions.length / 3;
+  const positions = [...opaque.positions, ...transparent.positions];
+  const normals = [...opaque.normals, ...transparent.normals];
+  const colors = [...opaque.colors, ...transparent.colors];
+  const indices = [...opaque.indices, ...transparent.indices.map(index => index + opaqueVertices)];
   return {
     positions: new Float32Array(positions),
     normals: new Float32Array(normals),
     colors: new Float32Array(colors),
     indices: new Uint32Array(indices),
-    faceCount,
+    faceCount: opaque.faceCount + transparent.faceCount,
+    opaqueIndexCount: opaque.indices.length,
+    transparentIndexCount: transparent.indices.length,
   };
+}
+
+function createSection(): SectionBuilder {
+  return { positions: [], normals: [], colors: [], indices: [], faceCount: 0 };
+}
+
+function appendFace(section: SectionBuilder, localX: number, worldY: number, localZ: number, color: number, face: Face, light: number): void {
+  const base = section.positions.length / 3;
+  const rgb = shadedRgb(color, face.shade * clampLight(light));
+  for (const vertex of face.vertices) {
+    section.positions.push(localX + vertex[0], worldY + vertex[1], localZ + vertex[2]);
+    section.normals.push(face.normal[0], face.normal[1], face.normal[2]);
+    section.colors.push(rgb[0], rgb[1], rgb[2]);
+  }
+  section.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  section.faceCount += 1;
+}
+
+function clampLight(value: number): number {
+  return Number.isFinite(value) ? Math.min(1.5, Math.max(0.08, value)) : 1;
 }
 
 function shadedRgb(color: number, shade: number): readonly [number, number, number] {

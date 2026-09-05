@@ -83,6 +83,17 @@ export class ChunkManager {
     for (const chunk of this.chunks.values()) this.dirty.add(chunkKey(chunk.x, chunk.z));
   }
 
+  markRadiusDirty(chunkX: number, chunkZ: number, radius: number): void {
+    if (!Number.isInteger(chunkX) || !Number.isInteger(chunkZ)) throw new TypeError('Chunk coordinates must be integers.');
+    if (!Number.isInteger(radius) || radius < 0 || radius > 4) throw new RangeError('Dirty radius must be an integer from 0 to 4.');
+    for (let dz = -radius; dz <= radius; dz += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const key = chunkKey(chunkX + dx, chunkZ + dz);
+        if (this.chunks.has(key)) this.dirty.add(key);
+      }
+    }
+  }
+
   values(): IterableIterator<Chunk> {
     return this.chunks.values();
   }
@@ -92,7 +103,7 @@ export class ChunkManager {
   }
 
   private markDirtyWithNeighbors(chunkX: number, chunkZ: number): void {
-    this.dirty.add(chunkKey(chunkX, chunkZ));
+    this.dirty.add(chunkKey(chunkX, chunk.z));
     this.dirty.add(chunkKey(chunkX - 1, chunkZ));
     this.dirty.add(chunkKey(chunkX + 1, chunkZ));
     this.dirty.add(chunkKey(chunkX, chunkZ - 1));

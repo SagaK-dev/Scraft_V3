@@ -4,6 +4,7 @@ import { validateItemDefinition } from './Item.ts';
 
 export const ItemIds = {
   GRASS: 1, DIRT: 2, STONE: 3, SAND: 4, WOOD: 5, LEAVES: 6, GLASS: 7, PLANKS: 8, CRAFTING_TABLE: 9, FURNACE: 10, CHEST: 11,
+  COAL_ORE: 12, IRON_ORE: 13, GLOW_CRYSTAL: 14, SNOW: 15,
   STICK: 100, WOODEN_PICKAXE: 101, WOODEN_AXE: 102, WOODEN_SHOVEL: 103, STONE_PICKAXE: 104, APPLE: 200,
 } as const;
 
@@ -38,6 +39,10 @@ export function createDefaultItemRegistry(): ItemRegistry {
     .register({ id: ItemIds.CRAFTING_TABLE, name: 'Crafting Table', maxStack: 64, color: 0x9b693d, placeBlockId: BlockIds.CRAFTING_TABLE })
     .register({ id: ItemIds.FURNACE, name: 'Furnace', maxStack: 64, color: 0x696d70, placeBlockId: BlockIds.FURNACE })
     .register({ id: ItemIds.CHEST, name: 'Chest', maxStack: 64, color: 0xa8733f, placeBlockId: BlockIds.CHEST })
+    .register({ id: ItemIds.COAL_ORE, name: 'Coal Ore', maxStack: 64, color: 0x4e5051, placeBlockId: BlockIds.COAL_ORE })
+    .register({ id: ItemIds.IRON_ORE, name: 'Iron Ore', maxStack: 64, color: 0xa77a5d, placeBlockId: BlockIds.IRON_ORE })
+    .register({ id: ItemIds.GLOW_CRYSTAL, name: 'Glow Crystal', maxStack: 64, color: 0x8be0cf, placeBlockId: BlockIds.GLOW_CRYSTAL })
+    .register({ id: ItemIds.SNOW, name: 'Snow', maxStack: 64, color: 0xe8f1f5, placeBlockId: BlockIds.SNOW })
     .register({ id: ItemIds.STICK, name: 'Stick', maxStack: 64, color: 0x9c7148 })
     .register({ id: ItemIds.WOODEN_PICKAXE, name: 'Wooden Pickaxe', maxStack: 1, color: 0xb98752, tool: { kind: 'pickaxe', tier: 0, speed: 2, maxDurability: 59 } })
     .register({ id: ItemIds.WOODEN_AXE, name: 'Wooden Axe', maxStack: 1, color: 0xb98752, tool: { kind: 'axe', tier: 0, speed: 2, maxDurability: 59 } })

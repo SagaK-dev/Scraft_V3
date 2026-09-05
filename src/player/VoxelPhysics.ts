@@ -5,6 +5,7 @@ const SUPPORT_PROBE = 0.08;
 
 export interface VoxelCollisionSource {
   isSolidBlock(x: number, y: number, z: number): boolean;
+  isLiquidBlock?(x: number, y: number, z: number): boolean;
 }
 
 export interface MotionVector {
@@ -129,9 +130,9 @@ export function moveAABB(
     stepLandingHit = false;
   }
 
-  const movedX = finalBounds.minX - initialBounds.minX;
-  const movedY = finalBounds.minY - initialBounds.minY;
-  const movedZ = finalBounds.minZ - initialBounds.minZ;
+  const movedX = (finalBounds.minX - initialBounds.minX);
+  const movedY = (finalBounds.minY - initialBounds.minY);
+  const movedZ = (finalBounds.minZ - initialBounds.minZ);
   const grounded = stepLandingHit || (delta.y < 0 && vertical.hit) || hasSupport(finalBounds, source);
 
   return {
@@ -155,7 +156,13 @@ function resolveHorizontal(bounds: AABB, deltaX: number, deltaZ: number, source:
 } {
   const x = sweepAxis(bounds, deltaX, 'x', source);
   const z = sweepAxis(x.bounds, deltaZ, 'z', source);
-  return { bounds: z.bounds, movedX: x.moved, movedZ: z.moved, hitX: x.hit, hitZ: z.hit };
+  return {
+    bounds: z.bounds,
+    movedX: x.moved,
+    movedZ: z.moved,
+    hitX: x.hit,
+    hitZ: z.hit,
+  };
 }
 
 function resolveSupportedHorizontal(bounds: AABB, deltaX: number, deltaZ: number, source: VoxelCollisionSource) {
@@ -212,7 +219,11 @@ function sweepAxis(bounds: AABB, delta: number, axis: 'x' | 'y' | 'z', source: V
     }
   }
 
-  return { bounds: translateAxis(bounds, axis, allowed), moved: allowed, hit: Math.abs(allowed - delta) > EPSILON };
+  return {
+    bounds: translateAxis(bounds, axis, allowed),
+    moved: allowed,
+    hit: Math.abs(allowed - delta) > EPSILON,
+  };
 }
 
 function translateAxis(bounds: AABB, axis: 'x' | 'y' | 'z', amount: number): AABB {

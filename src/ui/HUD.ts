@@ -24,16 +24,16 @@ export class HUD {
       <div class="survival-hud" aria-label="Survival status">
         <div class="survival-row"><span class="survival-label" data-health-text>HP 20/20</span><span class="survival-track health"><span data-health-fill></span></span></div>
         <div class="survival-row"><span class="survival-label" data-hunger-text>Hunger 20/20</span><span class="survival-track hunger"><span data-hunger-fill></span></span></div>
-        <span class="day-status" data-day-text>Day 12:00</span>
+        <span class="day-status" data-day-text>Day 12:00 / clear</span>
       </div>
       <pre class="debug-panel" hidden></pre>
       <div class="message" hidden></div>
       <div class="overlay">
         <section class="menu-panel" aria-label="Game menu">
           <h1>Scraft V3</h1>
-          <p class="subtitle">Phase 7 — Entities / Mobs / Projectiles</p>
+          <p class="subtitle">Phase 8 — Biomes / Caves / Lighting / Water / Weather</p>
           <button class="primary" data-action="start">ゲーム開始 / 再開</button>
-          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / Shift しゃがみ / 1〜9・ホイール Hotbar / E Inventory / 左クリック Mob攻撃・破壊 / 右クリック 使用・設置 / F3 デバッグ</div>
+          <div class="controls">WASD 移動 / Space ジャンプ・上向き泳ぎ / Ctrl ダッシュ / Shift しゃがみ・下向き泳ぎ / 1〜9・ホイール Hotbar / E Inventory / 左クリック Mob攻撃・破壊 / 右クリック 使用・設置 / F3 デバッグ</div>
           <details>
             <summary>設定</summary>
             <label>FOV <output data-output="fov"></output><input data-setting="fov" type="range" min="50" max="110" step="1"></label>
@@ -79,7 +79,7 @@ export class HUD {
     this.hungerText.textContent = `Hunger ${Math.ceil(hunger)}/${maxHunger}`;
   }
 
-  updateDayTime(phase: string, clock: string): void { this.dayText.textContent = `${phase} ${clock}`; }
+  updateDayTime(phase: string, clock: string, weather = 'clear'): void { this.dayText.textContent = `${phase} ${clock} / ${weather}`; }
 
   showMessage(text: string): void {
     this.message.textContent = text;

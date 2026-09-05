@@ -13,13 +13,15 @@ import { createDefaultBlockRegistry, BlockIds } from '../src/blocks/BlockRegistr
 const items = createDefaultItemRegistry();
 const recipes = createDefaultCraftingRegistry(items);
 
-test('default item registry maps blocks tools food and containers', () => {
-  assert.equal(items.size, 17);
+test('default item registry maps blocks tools food containers and Phase 8 resources', () => {
+  assert.equal(items.size, 21);
   assert.equal(items.get(ItemIds.DIRT).maxStack, 64);
   assert.equal(items.get(ItemIds.WOODEN_PICKAXE).tool?.maxDurability, 59);
   assert.equal(items.get(ItemIds.APPLE).food?.hunger, 4);
   assert.equal(items.getItemIdForBlock(BlockIds.FURNACE), ItemIds.FURNACE);
   assert.equal(items.getItemIdForBlock(BlockIds.CHEST), ItemIds.CHEST);
+  assert.equal(items.getItemIdForBlock(BlockIds.GLOW_CRYSTAL), ItemIds.GLOW_CRYSTAL);
+  assert.equal(items.getItemIdForBlock(BlockIds.IRON_ORE), ItemIds.IRON_ORE);
 });
 
 test('item stack enforces stack limits and tool durability', () => {
@@ -98,15 +100,12 @@ test('3x3 crafting creates tools furnace and chest but 2x2 cannot make 3x3 recip
   for (const i of [0, 1, 2]) pick.set(i, createStack(items, ItemIds.PLANKS), items);
   for (const i of [4, 7]) pick.set(i, createStack(items, ItemIds.STICK), items);
   assert.equal(previewCraft(pick, recipes)?.itemId, ItemIds.WOODEN_PICKAXE);
-
   const furnace = new CraftingGrid(3, 3);
   for (const i of [0,1,2,3,5,6,7,8]) furnace.set(i, createStack(items, ItemIds.STONE), items);
   assert.equal(previewCraft(furnace, recipes)?.itemId, ItemIds.FURNACE);
-
   const chest = new CraftingGrid(3, 3);
   for (const i of [0,1,2,3,5,6,7,8]) chest.set(i, createStack(items, ItemIds.PLANKS), items);
   assert.equal(previewCraft(chest, recipes)?.itemId, ItemIds.CHEST);
-
   const small = new CraftingGrid(2, 2);
   for (let i = 0; i < 4; i += 1) small.set(i, createStack(items, ItemIds.STONE), items);
   assert.notEqual(previewCraft(small, recipes)?.itemId, ItemIds.FURNACE);

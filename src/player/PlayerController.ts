@@ -13,6 +13,8 @@ const PLAYER_HALF_WIDTH = 0.3;
 const WALK_SPEED = 4.3;
 const SPRINT_SPEED = 6.8;
 const CROUCH_SPEED = 1.45;
+const SWIM_SPEED = 2.6;
+const SWIM_VERTICAL_SPEED = 3.2;
 const JUMP_SPEED = 7.0;
 const GRAVITY = -20;
 const TERMINAL_VELOCITY = -78.4;
@@ -29,6 +31,7 @@ export class PlayerController {
   private pitch = 0;
   private grounded = false;
   private crouched = false;
+  private submerged = false;
   private eyeHeight = STANDING_EYE_HEIGHT;
   private bodyHeight = STANDING_HEIGHT;
   private walkTime = 0;
@@ -45,33 +48,52 @@ export class PlayerController {
   update(dt: number, input: Pick<InputManager, 'isDown'>, collision: VoxelCollisionSource): void {
     this.previousPosition.copy(this.position);
     this.updateCrouch(input, collision);
+    this.submerged = this.intersectsLiquid(collision);
     const forwardInput = Number(input.isDown('KeyW')) - Number(input.isDown('KeyS'));
     const strafeInput = Number(input.isDown('KeyD')) - Number(input.isDown('KeyA'));
-    const sprinting = !this.crouched && (input.isDown('ControlLeft') || input.isDown('ControlRight'));
-    const speed = this.crouched ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED;
+    const sprinting = !this.submerged && !this.crouched && (input.isDown('ControlLeft') || input.isDown('ControlRight'));
+    const speed = this.submerged ? SWIM_SPEED : this.crouched ? CROUCH_SPEED : sprinting ? SPRINT_SPEED : WALK_SPEED;
     const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const wish = forward.multiplyScalar(forwardInput).add(right.multiplyScalar(strafeInput));
     if (wish.lengthSq() > 1) wish.normalize();
     wish.multiplyScalar(speed);
-    const accel = this.grounded ? GROUND_ACCELERATION : AIR_ACCELERATION;
+    const accel = this.submerged ? 14 : this.grounded ? GROUND_ACCELERATION : AIR_ACCELERATION;
     this.velocity.x = moveTowards(this.velocity.x, wish.x, accel * dt);
     this.velocity.z = moveTowards(this.velocity.z, wish.z, accel * dt);
-    if (wish.lengthSq() === 0 && this.grounded) {
+    if (wish.lengthSq() === 0 && this.grounded && !this.submerged) {
       const drag = Math.max(0, 1 - GROUND_DRAG * dt);
       this.velocity.x *= drag;
       this.velocity.z *= drag;
     }
-    if (this.grounded && input.isDown('Space')) {
-      this.velocity.y = JUMP_SPEED;
-      this.grounded = false;
+
+    if (this.submerged) {
+      const up = input.isDown('Space');
+      const down = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
+      const targetY = up ? SWIM_VERTICAL_SPEED : down ? -SWIM_VERTICAL_SPEED * 0.72 : -0.35;
+      this.velocity.y = moveTowards(this.velocity.y, targetY, 11 * dt);
+      const waterDrag = Math.max(0, 1 - 2.4 * dt);
+      this.velocity.x *= waterDrag;
+      this.velocity.z *= waterDrag;
+      this.accumulatedFallDistance = 0;
+      this.lastLandedFallDistance = 0;
+    } else {
+      if (this.grounded && input.isDown('Space')) {
+        this.velocity.y = JUMP_SPEED;
+        this.grounded = false;
+      }
+      this.velocity.y = Math.max(TERMINAL_VELOCITY, this.velocity.y + GRAVITY * dt);
     }
-    this.velocity.y = Math.max(TERMINAL_VELOCITY, this.velocity.y + GRAVITY * dt);
+
     const motion = moveAABB(
       this.getBounds(),
       { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt },
       collision,
-      { stepHeight: AUTO_STEP_HEIGHT, allowStep: this.grounded && !this.crouched && this.velocity.y <= 0, keepSupported: this.crouched && this.grounded },
+      {
+        stepHeight: AUTO_STEP_HEIGHT,
+        allowStep: !this.submerged && this.grounded && !this.crouched && this.velocity.y <= 0,
+        keepSupported: !this.submerged && this.crouched && this.grounded,
+      },
     );
     this.applyBounds(motion.bounds);
     if (motion.hitX) this.velocity.x = 0;
@@ -80,9 +102,9 @@ export class PlayerController {
     if (motion.grounded && this.velocity.y <= 0) this.velocity.y = 0;
     const wasGrounded = this.grounded;
     this.grounded = motion.grounded;
-    if (!this.grounded && motion.moved.y < 0) this.accumulatedFallDistance += -motion.moved.y;
+    if (!this.submerged && !this.grounded && motion.moved.y < 0) this.accumulatedFallDistance += -motion.moved.y;
     if (this.grounded) {
-      if (!wasGrounded && this.accumulatedFallDistance > 0) this.lastLandedFallDistance = this.accumulatedFallDistance;
+      if (!this.submerged && !wasGrounded && this.accumulatedFallDistance > 0) this.lastLandedFallDistance = this.accumulatedFallDistance;
       this.accumulatedFallDistance = 0;
     }
     const horizontalSpeed = Math.hypot(this.velocity.x, this.velocity.z);
@@ -95,11 +117,11 @@ export class PlayerController {
     camera.rotation.y = this.yaw;
     camera.rotation.x = this.pitch;
     const speed = Math.hypot(this.velocity.x, this.velocity.z);
-    if (settings.viewBob && playing && this.grounded && speed > 0.25) {
+    if (settings.viewBob && playing && this.grounded && !this.submerged && speed > 0.25) {
       camera.position.y += Math.sin(this.walkTime * 1.7) * 0.025 * Math.min(1, speed / WALK_SPEED);
       camera.position.x += Math.cos(this.walkTime * 0.85) * 0.012 * Math.min(1, speed / WALK_SPEED);
     }
-    const sprintFactor = playing && !this.crouched ? THREE.MathUtils.smoothstep(speed, WALK_SPEED, SPRINT_SPEED) : 0;
+    const sprintFactor = playing && !this.submerged && !this.crouched ? THREE.MathUtils.smoothstep(speed, WALK_SPEED, SPRINT_SPEED) : 0;
     const targetFov = settings.fov + sprintFactor * 7;
     camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 10, frameDelta);
     camera.updateProjectionMatrix();
@@ -116,6 +138,7 @@ export class PlayerController {
     this.previousPosition.copy(this.position);
     this.velocity.set(0, 0, 0);
     this.grounded = false;
+    this.submerged = false;
     this.accumulatedFallDistance = 0;
     this.lastLandedFallDistance = 0;
   }
@@ -137,6 +160,7 @@ export class PlayerController {
   sync(): void { this.previousPosition.copy(this.position); }
   get isGrounded(): boolean { return this.grounded; }
   get isCrouched(): boolean { return this.crouched; }
+  get isSubmerged(): boolean { return this.submerged; }
   get fallDistance(): number { return this.accumulatedFallDistance; }
   get lastFallDistance(): number { return this.lastLandedFallDistance; }
 
@@ -161,5 +185,23 @@ export class PlayerController {
     this.position.x = (bounds.minX + bounds.maxX) / 2;
     this.position.y = bounds.minY + this.eyeHeight;
     this.position.z = (bounds.minZ + bounds.maxZ) / 2;
+  }
+
+  private intersectsLiquid(collision: VoxelCollisionSource): boolean {
+    const isLiquidBlock = collision.isLiquidBlock;
+    if (!isLiquidBlock) return false;
+    const bounds = this.getBounds();
+    const minX = Math.floor(bounds.minX + 1e-6);
+    const maxX = Math.floor(bounds.maxX - 1e-6);
+    const minY = Math.floor(bounds.minY + 0.05);
+    const maxY = Math.floor(bounds.maxY - 0.05);
+    const minZ = Math.floor(bounds.minZ + 1e-6);
+    const maxZ = Math.floor(bounds.maxZ - 1e-6);
+    for (let y = minY; y <= maxY; y += 1) {
+      for (let z = minZ; z <= maxZ; z += 1) {
+        for (let x = minX; x <= maxX; x += 1) if (isLiquidBlock(x, y, z)) return true;
+      }
+    }
+    return false;
   }
 }

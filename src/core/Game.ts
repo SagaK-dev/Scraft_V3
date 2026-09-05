@@ -19,6 +19,7 @@ import { InventoryUI, type InventoryScreenMode } from '../ui/InventoryUI';
 import { BlockBreaker } from '../world/BlockBreaker';
 import type { VoxelHit } from '../world/VoxelRaycast';
 import { VoxelWorld } from '../world/VoxelWorld';
+import { WeatherSystem } from '../world/WeatherSystem';
 import { splitCoordinate } from '../world/coordinates';
 import { resolveWorldSeed } from '../world/WorldSeed';
 import { FixedStep } from './FixedStep';
@@ -45,6 +46,7 @@ export class Game {
   private readonly containerUI: ContainerUI;
   private readonly survival = new SurvivalState();
   private readonly dayNight = new DayNightCycle();
+  private readonly weather: WeatherSystem;
   private readonly audio = new GameAudio();
   private readonly blockEntities = new BlockEntityStore();
   private readonly melee = new MeleeCombat();
@@ -75,9 +77,10 @@ export class Game {
         onGenerationError: message => this.hud.showMessage(message),
       });
       this.world.ensurePhysicsNeighborhood(SPAWN_X, SPAWN_Z);
-      this.player.teleportToFeet(SPAWN_X, this.world.getSurfaceHeight(SPAWN_X, SPAWN_Z) + 1, SPAWN_Z);
+      this.player.teleportToFeet(SPAWN_X, this.world.getSafeSpawnFeetY(SPAWN_X, SPAWN_Z), SPAWN_Z);
       this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
       this.entities = new EntityManager(this.renderer.scene, this.world, this.items, this.world.seed);
+      this.weather = new WeatherSystem(this.world.seed);
     } catch (error) {
       this.hud.fatal(error instanceof Error ? error.message : '描画を初期化できません。');
       this.hud.dispose();
@@ -126,8 +129,10 @@ export class Game {
 
     this.blockEntities.update(delta, this.items);
     this.dayNight.update(delta);
+    this.weather.update(delta);
     this.melee.update(delta);
     this.renderer.applyDayNight(this.dayNight.normalizedTime, this.dayNight.daylight);
+    this.renderer.applyWeather(this.weather.phase, this.weather.intensity, time / 1000, this.player.position);
     this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     this.updateVoxelInteraction(delta);
     this.refreshContainerUi(delta);
@@ -144,7 +149,7 @@ export class Game {
     this.world.ensurePhysicsNeighborhood(this.player.position.x, this.player.position.z);
     this.player.update(dt, this.input, this.world);
     const horizontalSpeed = Math.hypot(this.player.velocity.x, this.player.velocity.z);
-    if (horizontalSpeed > 0.1) {
+    if (horizontalSpeed > 0.1 && !this.player.isSubmerged) {
       const sprinting = !this.player.isCrouched && (this.input.isDown('ControlLeft') || this.input.isDown('ControlRight'));
       this.survival.addExhaustion(horizontalSpeed * dt * (sprinting ? 0.03 : 0.005));
     }
@@ -331,7 +336,7 @@ export class Game {
 
   private updateHudStatus(): void {
     this.hud.updateSurvival(this.survival.health, MAX_HEALTH, this.survival.hunger, MAX_HUNGER);
-    this.hud.updateDayTime(this.dayNight.phase, this.dayNight.clockText);
+    this.hud.updateDayTime(this.dayNight.phase, this.dayNight.clockText, this.weather.phase);
   }
 
   private updateDebug(): void {
@@ -341,18 +346,19 @@ export class Game {
     const selected = this.inventory.selectedStack;
     const selectedName = selected ? `${this.items.get(selected.itemId).name}${selected.count > 1 ? ` x${selected.count}` : ''}` : 'empty';
     this.hud.updateDebug([
-      'Scraft V3 / Phase 7',
+      'Scraft V3 / Phase 8',
       `FPS ${(this.statsFrames / Math.max(this.statsTime, 0.001)).toFixed(0)}`,
       `XYZ ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
       `Chunk XZ ${splitCoordinate(p.x).chunk} / ${splitCoordinate(p.z).chunk}`,
+      `Biome ${this.world.getBiome(p.x, p.z)}`,
       `Seed ${this.world.seed}`,
       `Render distance ${this.settings.renderDistance}`,
       `Chunks ${this.world.loadedChunkCount} loaded / ${this.world.pendingChunkCount} pending`,
       `Runtime edits ${this.world.runtimeEditCount} | Block entities ${this.blockEntities.size}`,
       `Entities ${this.entities.entityCount} | Mobs ${this.entities.passiveCount} passive / ${this.entities.hostileCount} hostile | Drops ${this.entities.itemDropCount} | Projectiles ${this.entities.projectileCount}`,
-      `Physics ${this.player.isGrounded ? 'grounded' : 'airborne'} / ${this.player.isCrouched ? 'crouched' : 'standing'} / fall ${this.player.fallDistance.toFixed(2)}`,
+      `Physics ${this.player.isGrounded ? 'grounded' : 'airborne'} / ${this.player.isCrouched ? 'crouched' : 'standing'} / ${this.player.isSubmerged ? 'water' : 'dry'} / fall ${this.player.fallDistance.toFixed(2)}`,
       `Survival HP ${this.survival.health.toFixed(1)}/${MAX_HEALTH} | Hunger ${this.survival.hunger.toFixed(1)}/${MAX_HUNGER} | Sat ${this.survival.saturation.toFixed(1)}`,
-      `Time ${this.dayNight.phase} ${this.dayNight.clockText} | daylight ${this.dayNight.daylight.toFixed(2)}`,
+      `Time ${this.dayNight.phase} ${this.dayNight.clockText} | daylight ${this.dayNight.daylight.toFixed(2)} | weather ${this.weather.phase} ${Math.round(this.weather.intensity * 100)}%`,
       `Hotbar ${this.inventory.selectedHotbarIndex + 1}: ${selectedName}`,
       `Target ${target}`,
       `Triangles ${info.render.triangles} | Draw calls ${info.render.calls}`,
@@ -364,7 +370,7 @@ export class Game {
 
   private respawnPlayer(): void {
     this.world.ensurePhysicsNeighborhood(SPAWN_X, SPAWN_Z);
-    this.player.teleportToFeet(SPAWN_X, this.world.getSurfaceHeight(SPAWN_X, SPAWN_Z) + 1, SPAWN_Z);
+    this.player.teleportToFeet(SPAWN_X, this.world.getSafeSpawnFeetY(SPAWN_X, SPAWN_Z), SPAWN_Z);
     this.survival.respawn();
     this.breaker.reset();
     this.hud.showMessage('HPが0になったためスポーン地点へ戻りました。');

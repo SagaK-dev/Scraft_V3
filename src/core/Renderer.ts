@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { WeatherRenderer } from '../world/WeatherRenderer';
+import type { WeatherPhase } from '../world/WeatherSystem';
 
 export class Renderer {
   readonly scene = new THREE.Scene();
@@ -10,6 +12,8 @@ export class Renderer {
   private readonly skyDay = new THREE.Color(0x86b9e8);
   private readonly skyNight = new THREE.Color(0x08121f);
   private readonly skyScratch = new THREE.Color();
+  private readonly stormSky = new THREE.Color(0x374452);
+  private readonly weatherRenderer: WeatherRenderer;
 
   constructor(canvas: HTMLCanvasElement, onContextLost: () => void) {
     const probe = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' });
@@ -24,6 +28,7 @@ export class Renderer {
     this.sun = new THREE.DirectionalLight(0xfff1d0, 2.2);
     this.sun.position.set(20, 35, 12);
     this.scene.add(this.sun);
+    this.weatherRenderer = new WeatherRenderer(this.scene);
     canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); onContextLost(); }, { once: true });
     this.resizeObserver = new ResizeObserver(this.resize);
     this.resizeObserver.observe(canvas);
@@ -43,13 +48,34 @@ export class Renderer {
     if (this.scene.fog instanceof THREE.Fog) this.scene.fog.color.copy(this.skyScratch);
   }
 
+  applyWeather(phase: WeatherPhase, intensity: number, elapsedSeconds: number, playerPosition?: { readonly x: number; readonly y: number; readonly z: number }): void {
+    const amount = THREE.MathUtils.clamp(intensity, 0, 1);
+    if (amount > 0) {
+      const darkness = phase === 'storm' ? 0.62 : 0.32;
+      this.sun.intensity *= 1 - amount * darkness;
+      this.hemisphere.intensity *= 1 - amount * darkness * 0.55;
+      this.skyScratch.lerp(this.stormSky, amount * (phase === 'storm' ? 0.68 : 0.32));
+      this.gl.setClearColor(this.skyScratch, 1);
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.color.copy(this.skyScratch);
+        this.scene.fog.near = 35 - amount * 10;
+        this.scene.fog.far = 150 - amount * 55;
+      }
+    } else if (this.scene.fog instanceof THREE.Fog) {
+      this.scene.fog.near = 35;
+      this.scene.fog.far = 150;
+    }
+    if (playerPosition) this.weatherRenderer.update(phase, amount, elapsedSeconds, new THREE.Vector3(playerPosition.x, playerPosition.y, playerPosition.z));
+    else this.weatherRenderer.update(phase, amount, elapsedSeconds, this.camera.position);
+  }
+
   setFov(fov: number): void {
     if (Math.abs(this.camera.fov - fov) < 0.01) return;
     this.camera.fov = fov;
     this.camera.updateProjectionMatrix();
   }
 
-  dispose(): void { this.resizeObserver.disconnect(); this.gl.dispose(); }
+  dispose(): void { this.resizeObserver.disconnect(); this.weatherRenderer.dispose(this.scene); this.gl.dispose(); }
 
   private readonly resize = (): void => {
     const canvas = this.gl.domElement;
