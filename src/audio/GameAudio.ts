@@ -1,4 +1,4 @@
-export type GameSound = 'break' | 'place' | 'hurt' | 'eat' | 'attack' | 'open' | 'close' | 'smelt';
+export type GameSound = 'break' | 'place' | 'hurt' | 'eat' | 'attack' | 'open' | 'close' | 'smelt' | 'pickup' | 'projectile' | 'mob';
 
 export class GameAudio {
   private context: AudioContext | null = null;
@@ -50,4 +50,7 @@ const SOUND_PROFILES: Record<GameSound, { readonly frequency: number; readonly e
   open: { frequency: 240, endFrequency: 360, duration: 0.08, gain: 0.13, type: 'sine' },
   close: { frequency: 350, endFrequency: 220, duration: 0.07, gain: 0.13, type: 'sine' },
   smelt: { frequency: 300, endFrequency: 420, duration: 0.12, gain: 0.1, type: 'triangle' },
+  pickup: { frequency: 520, endFrequency: 760, duration: 0.07, gain: 0.11, type: 'sine' },
+  projectile: { frequency: 380, endFrequency: 190, duration: 0.09, gain: 0.12, type: 'triangle' },
+  mob: { frequency: 135, endFrequency: 105, duration: 0.11, gain: 0.13, type: 'square' },
 };

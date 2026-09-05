@@ -61,6 +61,18 @@ export class BlockEntityStore {
     return true;
   }
 
+  extractAt(x: number, y: number, z: number): ItemStack[] {
+    const key = blockEntityKey(x, y, z);
+    const stacks: ItemStack[] = [];
+    const chest = this.chests.get(key);
+    if (chest) for (const stack of chest.snapshot()) if (stack) stacks.push(stack);
+    const furnace = this.furnaces.get(key);
+    if (furnace) for (const stack of furnace.inventory.snapshot()) if (stack) stacks.push(stack);
+    this.chests.delete(key);
+    this.furnaces.delete(key);
+    return stacks;
+  }
+
   remove(x: number, y: number, z: number): void {
     const key = blockEntityKey(x, y, z);
     this.chests.delete(key);

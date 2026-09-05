@@ -67,11 +67,12 @@ export class PlayerController {
       this.grounded = false;
     }
     this.velocity.y = Math.max(TERMINAL_VELOCITY, this.velocity.y + GRAVITY * dt);
-    const motion = moveAABB(this.getBounds(), { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt }, collision, {
-      stepHeight: AUTO_STEP_HEIGHT,
-      allowStep: this.grounded && !this.crouched && this.velocity.y <= 0,
-      keepSupported: this.crouched && this.grounded,
-    });
+    const motion = moveAABB(
+      this.getBounds(),
+      { x: this.velocity.x * dt, y: this.velocity.y * dt, z: this.velocity.z * dt },
+      collision,
+      { stepHeight: AUTO_STEP_HEIGHT, allowStep: this.grounded && !this.crouched && this.velocity.y <= 0, keepSupported: this.crouched && this.grounded },
+    );
     this.applyBounds(motion.bounds);
     if (motion.hitX) this.velocity.x = 0;
     if (motion.hitZ) this.velocity.z = 0;
@@ -123,6 +124,14 @@ export class PlayerController {
     const distance = this.lastLandedFallDistance;
     this.lastLandedFallDistance = 0;
     return distance;
+  }
+
+  applyImpulse(x: number, y: number, z: number): void {
+    if (![x, y, z].every(Number.isFinite)) throw new RangeError('Player impulse must be finite.');
+    this.velocity.x += x;
+    this.velocity.y += y;
+    this.velocity.z += z;
+    if (y > 0) this.grounded = false;
   }
 
   sync(): void { this.previousPosition.copy(this.position); }

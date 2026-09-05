@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GameAudio } from '../audio/GameAudio';
 import { BlockIds } from '../blocks/BlockRegistry';
-import { CombatTargetManager } from '../combat/CombatTargetManager';
 import { MELEE_RANGE, MeleeCombat } from '../combat/MeleeCombat';
+import { EntityManager } from '../entities/EntityManager';
+import { knockbackVector } from '../entities/EntityMath';
 import { BlockEntityStore } from '../containers/BlockEntityStore';
 import { createDefaultCraftingRegistry } from '../crafting/CraftingRegistry';
 import { createPhaseFiveStarterInventory } from '../inventory/PlayerInventory';
@@ -47,7 +48,7 @@ export class Game {
   private readonly audio = new GameAudio();
   private readonly blockEntities = new BlockEntityStore();
   private readonly melee = new MeleeCombat();
-  private readonly targets: CombatTargetManager;
+  private readonly entities: EntityManager;
   private settings = loadSettings();
   private frame = 0;
   private lastTime: number | undefined;
@@ -76,9 +77,7 @@ export class Game {
       this.world.ensurePhysicsNeighborhood(SPAWN_X, SPAWN_Z);
       this.player.teleportToFeet(SPAWN_X, this.world.getSurfaceHeight(SPAWN_X, SPAWN_Z) + 1, SPAWN_Z);
       this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
-      const targetX = SPAWN_X + 4;
-      const targetZ = SPAWN_Z;
-      this.targets = new CombatTargetManager(this.renderer.scene, targetX, this.world.getSurfaceHeight(targetX, targetZ) + 1, targetZ);
+      this.entities = new EntityManager(this.renderer.scene, this.world, this.items, this.world.seed);
     } catch (error) {
       this.hud.fatal(error instanceof Error ? error.message : '描画を初期化できません。');
       this.hud.dispose();
@@ -128,7 +127,6 @@ export class Game {
     this.blockEntities.update(delta, this.items);
     this.dayNight.update(delta);
     this.melee.update(delta);
-    this.targets.update(delta);
     this.renderer.applyDayNight(this.dayNight.normalizedTime, this.dayNight.daylight);
     this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     this.updateVoxelInteraction(delta);
@@ -160,6 +158,16 @@ export class Game {
         this.hud.showMessage(`落下ダメージ ${damage}`);
       }
     }
+    this.entities.update(dt, this.player.position, this.player.getBounds(), this.dayNight.daylight, {
+      tryPickup: stack => this.inventory.insert(stack, this.items),
+      onPickup: stack => {
+        this.audio.play('pickup');
+        this.inventoryUI.refresh();
+        this.hud.showMessage(`${this.items.get(stack.itemId).name} x${stack.count} を拾いました`);
+      },
+      onPlayerDamage: (damage, source) => this.damagePlayerFromEntity(damage, source),
+    });
+
     const survivalUpdate = this.survival.update(dt);
     if (survivalUpdate.damaged > 0) this.audio.play('hurt');
     if (this.survival.isDead) this.respawnPlayer();
@@ -176,13 +184,13 @@ export class Game {
 
     this.renderer.camera.getWorldDirection(this.lookDirection);
     const hit = this.world.raycast(this.renderer.camera.position, this.lookDirection);
-    const combatHit = this.targets.raycast(this.renderer.camera.position, this.lookDirection, MELEE_RANGE);
-    if (combatHit && (!hit || combatHit.distance < hit.distance)) {
+    const mobHit = this.entities.raycastMobs(this.renderer.camera.position, this.lookDirection, MELEE_RANGE);
+    if (mobHit && (!hit || mobHit.distance < hit.distance)) {
       this.lastHit = null;
       this.world.setSelection(null);
       this.breaker.reset();
-      this.hud.setInteraction(`Training Target HP ${combatHit.health}/${combatHit.maxHealth}`);
-      if (this.input.consumeMousePress(0)) this.attackTarget();
+      this.hud.setInteraction(`${mobHit.name} HP ${mobHit.health.toFixed(1)}/${mobHit.maxHealth}`);
+      if (this.input.consumeMousePress(0)) this.attackMob(mobHit.id);
       return;
     }
 
@@ -220,23 +228,11 @@ export class Game {
     } else this.hud.setInteraction('');
 
     if (update.completed && hit) {
-      const blockItemId = this.items.getItemIdForBlock(hit.blockId);
-      const blockDrop = blockItemId === undefined ? [] : [createStack(this.items, blockItemId)];
-      if ((hit.blockId === BlockIds.CHEST || hit.blockId === BlockIds.FURNACE)
-        && !this.blockEntities.canDrainAt(hit.x, hit.y, hit.z, this.inventory, this.items, blockDrop)) {
-        this.hud.showMessage('容器の中身と本体を回収する空きがありません。');
-        this.breaker.reset();
-        return;
-      }
       const blockName = this.world.blocks.get(hit.blockId).name;
       if (this.world.breakBlock(hit)) {
-        if (hit.blockId === BlockIds.CHEST || hit.blockId === BlockIds.FURNACE) {
-          if (!this.blockEntities.tryDrainAt(hit.x, hit.y, hit.z, this.inventory, this.items)) {
-            throw new Error('Container drain diverged after successful preflight.');
-          }
-        }
-        this.blockEntities.remove(hit.x, hit.y, hit.z);
-        this.collectBlockDrop(hit.blockId);
+        const contents = this.blockEntities.extractAt(hit.x, hit.y, hit.z);
+        if (contents.length > 0) this.entities.spawnDrops(contents, hit.x + 0.5, hit.y + 0.8, hit.z + 0.5);
+        this.spawnBlockDrop(hit.blockId, hit.x, hit.y, hit.z);
         const durability = this.inventory.damageSelectedTool(this.items);
         if (durability.broken) this.hud.showMessage(`${selectedItem?.name ?? 'Tool'} が壊れました`);
         else this.hud.showMessage(`${blockName} を破壊しました`);
@@ -259,24 +255,32 @@ export class Game {
     }
   }
 
-  private attackTarget(): void {
+  private attackMob(id: number): void {
     const stack = this.inventory.selectedStack;
     const item = stack ? this.items.get(stack.itemId) : null;
     const attack = this.melee.tryAttack(item);
     if (!attack.attacked) return;
-    const result = this.targets.damage(attack.damage);
+    const result = this.entities.damageMob(id, attack.damage, this.player.position);
     if (!result.damaged) return;
-    this.audio.play('attack');
+    this.audio.play(result.killed ? 'mob' : 'attack');
     if (item?.tool) this.inventory.damageSelectedTool(this.items);
     this.inventoryUI.refresh();
-    this.hud.showMessage(result.killed ? 'Training Target を倒しました' : `攻撃 ${attack.damage.toFixed(1)} damage`);
+    this.hud.showMessage(result.killed ? `${result.kind === 'grazer' ? 'Grazer' : 'Stalker'} を倒しました` : `攻撃 ${attack.damage.toFixed(1)} damage`);
   }
 
-  private collectBlockDrop(blockId: number): void {
+  private spawnBlockDrop(blockId: number, x: number, y: number, z: number): void {
     const itemId = this.items.getItemIdForBlock(blockId);
     if (itemId === undefined) return;
-    const remainder = this.inventory.insert(createStack(this.items, itemId), this.items);
-    if (remainder) this.hud.showMessage('インベントリが満杯のため、ブロックを回収できませんでした。');
+    this.entities.spawnItemDrop(createStack(this.items, itemId), x + 0.5, y + 0.65, z + 0.5);
+  }
+
+  private damagePlayerFromEntity(damage: number, source: { readonly x: number; readonly y: number; readonly z: number }): void {
+    const applied = this.survival.damage(damage, 'combat');
+    if (applied <= 0) return;
+    const knockback = knockbackVector(source, this.player.position, 4.1, 3.0);
+    this.player.applyImpulse(knockback.x, knockback.y, knockback.z);
+    this.audio.play('hurt');
+    this.hud.showMessage(`Mobから ${applied.toFixed(1)} damage`);
   }
 
   private openInventory(mode: InventoryScreenMode): void {
@@ -337,7 +341,7 @@ export class Game {
     const selected = this.inventory.selectedStack;
     const selectedName = selected ? `${this.items.get(selected.itemId).name}${selected.count > 1 ? ` x${selected.count}` : ''}` : 'empty';
     this.hud.updateDebug([
-      'Scraft V3 / Phase 6',
+      'Scraft V3 / Phase 7',
       `FPS ${(this.statsFrames / Math.max(this.statsTime, 0.001)).toFixed(0)}`,
       `XYZ ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
       `Chunk XZ ${splitCoordinate(p.x).chunk} / ${splitCoordinate(p.z).chunk}`,
@@ -345,6 +349,7 @@ export class Game {
       `Render distance ${this.settings.renderDistance}`,
       `Chunks ${this.world.loadedChunkCount} loaded / ${this.world.pendingChunkCount} pending`,
       `Runtime edits ${this.world.runtimeEditCount} | Block entities ${this.blockEntities.size}`,
+      `Entities ${this.entities.entityCount} | Mobs ${this.entities.passiveCount} passive / ${this.entities.hostileCount} hostile | Drops ${this.entities.itemDropCount} | Projectiles ${this.entities.projectileCount}`,
       `Physics ${this.player.isGrounded ? 'grounded' : 'airborne'} / ${this.player.isCrouched ? 'crouched' : 'standing'} / fall ${this.player.fallDistance.toFixed(2)}`,
       `Survival HP ${this.survival.health.toFixed(1)}/${MAX_HEALTH} | Hunger ${this.survival.hunger.toFixed(1)}/${MAX_HUNGER} | Sat ${this.survival.saturation.toFixed(1)}`,
       `Time ${this.dayNight.phase} ${this.dayNight.clockText} | daylight ${this.dayNight.daylight.toFixed(2)}`,
@@ -382,7 +387,7 @@ export class Game {
     this.input.dispose();
     this.inventoryUI.dispose();
     this.containerUI.dispose();
-    this.targets.dispose();
+    this.entities.dispose();
     this.audio.dispose();
     this.world.dispose();
     this.hud.dispose();

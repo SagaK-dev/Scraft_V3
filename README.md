@@ -6,30 +6,31 @@ Minecraftの公式テクスチャ、音声、コード、ロゴ等は使用し�
 
 ## 現在の状態
 
-Phase 6: Survival / Combat / Day-Night / Audio / Furnace / Chestまで実装済みです。
+Phase 7: Entities / Mobs / Item Drops / Projectilesまで実装済みです。
 
 - Phase 1: Three.js / WebGL2 / FPS視点 / 固定60Hz更新 / 設定 / F3 / CI
 - Phase 2: Block / Chunk / Uint16Array / meshing / Raycast / break / place
 - Phase 3: Seeded Noise地形 / 決定的生成 / chunk streaming / Render Distance
 - Phase 4: Voxel AABB / gravity / jump / crouch / step / anti-tunneling
 - Phase 5: ItemRegistry / Hotbar / Inventory / 2x2・3x3 Crafting / tools / durability
-- HP 20 / Hunger 20 / saturation / movement exhaustion
-- Hunger 18以上で自然回復、Hunger 0で飢餓ダメージ
-- 3ブロックを超える落下距離に応じた落下ダメージ
-- HP 0で安全なSeed地形スポーンへリスポーン
-- hand/tool別の近接ダメージ、0.5秒attack cooldown、tool durability消費
-- Phase 7前の戦闘確認用Training Target（8秒後リスポーン）
-- 20分周期のDay/Night、太陽位置・空色・Fog・環境光を連動
-- Web Audio APIで生成する独自効果音（外部音源asset不使用）
-- Furnace block / 3 slots / fuel / progress / Sand -> Glass smelting
-- Chest block / 27 slots
-- Furnace / Chestのsession-local block entity保持
-- Container UIで左/右/Shift click、drag/drop
-- Container破壊時は内容物と本体をInventoryへtransactionalに回収し、入り切らなければ破壊を止める
-- Furnace recipe: Stone 8個を3x3外周
-- Chest recipe: Wooden Planks 8個を3x3外周
+- Phase 6: HP/Hunger / fall damage / Day-Night / Audio / Furnace / Chest
+- EntityManagerでMob / Item Drop / Projectileのlifecycleを管理
+- Block・Chest・Furnace・Mobのdropを地面のItem Drop Entityへ統一
+- Item Dropは重力・地面衝突・bounce・drag・pickup delay・5分lifetimeを持つ
+- Player AABB近傍で自動Pickupし、Inventoryへ一部しか入らない場合は残数を地面に保持
+- 近距離の同種Item Dropをstack上限までmerge
+- Passive Mob `Grazer`: 徘徊、被弾時の逃走、Apple drop
+- Hostile Mob `Stalker`: 夜間spawn、Player検知、追跡、近接攻撃、遠距離Projectile、Stone drop
+- Seed + spawn cycleから決定的にspawn候補を生成し、昼夜・個体数cap・距離で制御
+- spawn距離14〜28 blocks、passive cap 6、hostile cap 8、52 blocks超でdespawn
+- bounded A*による簡易Pathfinding（4方向、段差対応、探索node/path長上限）
+- Mob移動もVoxel AABB collision / gravity / 1-block stepを使用
+- Mob被弾・Player被弾のknockback
+- Projectileは移動区間のcontinuous collisionで壁・Playerとの最近接hitを解決
+- Stalkerの近接攻撃はLine of Sightと高低差制限を要求し、壁越し攻撃を防止
+- F3にEntity / Passive / Hostile / Item Drop / Projectile数を追加
 
-Phase 7/8で自然な食料・Mob dropが入るまでは、Survival動作確認用として開始時にAppleを4個仮配置しています。Wood 8個のCrafting確認用starterも継続しています。
+Phase 8ではBiome、洞窟、鉱石、木・植物、Sun/Block Light、水、天候、structure extension pointsへ進みます。
 
 SeedはURLクエリで変更できます。
 
@@ -64,7 +65,7 @@ Node.js 22.12以上を使用してください。
 - マウス: 視点
 - 1〜9 / マウスホイール: Hotbar
 - E: Inventory / 2x2 Crafting
-- 左クリック: Training Targetへ近接攻撃 / ブロック長押し破壊
+- 左クリック: Mobへ近接攻撃 / ブロック長押し破壊
 - 右クリック: food使用 / block設置 / Crafting Table / Furnace / Chest操作
 - Inventory/Container 左クリック: stackを持つ / 置く
 - 右クリック: stackを半分持つ / 1個置く

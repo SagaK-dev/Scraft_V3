@@ -31,9 +31,9 @@ export class HUD {
       <div class="overlay">
         <section class="menu-panel" aria-label="Game menu">
           <h1>Scraft V3</h1>
-          <p class="subtitle">Phase 6 — Survival / Combat / Containers</p>
+          <p class="subtitle">Phase 7 — Entities / Mobs / Projectiles</p>
           <button class="primary" data-action="start">ゲーム開始 / 再開</button>
-          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / Shift しゃがみ / 1〜9・ホイール Hotbar / E Inventory / 左クリック 攻撃・破壊 / 右クリック 使用・設置 / F3 デバッグ</div>
+          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / Shift しゃがみ / 1〜9・ホイール Hotbar / E Inventory / 左クリック Mob攻撃・破壊 / 右クリック 使用・設置 / F3 デバッグ</div>
           <details>
             <summary>設定</summary>
             <label>FOV <output data-output="fov"></output><input data-setting="fov" type="range" min="50" max="110" step="1"></label>

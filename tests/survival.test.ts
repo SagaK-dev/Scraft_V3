@@ -123,3 +123,15 @@ test('container preflight includes the container block drop itself', () => {
   assert.equal(store.canDrainAt(2, 3, 4, player, items, [createStack(items, ItemIds.CHEST)]), false);
   assert.equal(chest.get(0)?.itemId, ItemIds.APPLE);
 });
+
+
+test('extractAt returns container contents and removes stored block entity state', () => {
+  const store = new BlockEntityStore();
+  store.getChest(-4, 5, -6).set(0, createStack(items, ItemIds.APPLE, 2), items);
+  const extracted = store.extractAt(-4, 5, -6);
+  assert.equal(extracted.length, 1);
+  assert.equal(extracted[0]?.itemId, ItemIds.APPLE);
+  assert.equal(extracted[0]?.count, 2);
+  assert.equal(store.size, 0);
+  assert.equal(store.getChest(-4, 5, -6).get(0), null);
+});
