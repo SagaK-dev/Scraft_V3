@@ -1,0 +1,61 @@
+.survival-hud {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 3;
+  width: 220px;
+  padding: 10px 12px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 8px;
+  background: rgb(9 13 18 / 66%);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+.survival-row { display: grid; grid-template-columns: 82px 1fr; gap: 8px; align-items: center; margin: 4px 0; }
+.survival-label { font: 700 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #eef5f2; }
+.survival-track { position: relative; height: 8px; border-radius: 999px; overflow: hidden; background: rgb(255 255 255 / 12%); }
+.survival-track > span { display: block; height: 100%; width: 100%; transition: width 120ms linear; }
+.survival-track.health > span { background: linear-gradient(90deg, #a62d35, #df5a58); }
+.survival-track.hunger > span { background: linear-gradient(90deg, #9b6b2d, #e0a447); }
+.day-status { display: block; margin-top: 6px; color: #cbd5dd; font: 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+.container-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  background: rgb(4 7 10 / 66%);
+  backdrop-filter: blur(3px);
+}
+.container-overlay[hidden] { display: none; }
+.container-panel {
+  width: min(94vw, 620px);
+  padding: 20px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 10px;
+  background: #202831;
+  box-shadow: 0 24px 90px rgb(0 0 0 / 55%);
+  user-select: none;
+}
+.container-slots { display: grid; gap: 4px; justify-content: center; margin: 12px 0 18px; }
+.container-slots.chest { grid-template-columns: repeat(9, 48px); }
+.container-slots.furnace { grid-template-columns: repeat(3, 64px); gap: 18px; }
+.container-slots.furnace .slot { width: 64px; height: 64px; overflow: visible; }
+.slot-label { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%); color: #aebbc4; font: 10px/1 sans-serif; white-space: nowrap; }
+.container-progress {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: min(100%, 340px);
+  margin: 0 auto 12px;
+}
+.container-progress[hidden] { display: none; }
+.container-progress > span { position: relative; height: 7px; border-radius: 999px; background: #151a20; overflow: hidden; }
+.container-progress > span::after { content: ''; display: block; height: 100%; width: var(--burn, 0%); background: #e4873e; }
+.container-progress > span[data-cook]::after { width: var(--cook, 0%); background: #d7d7c9; }
+@media (max-width: 560px) {
+  .survival-hud { width: 180px; left: 8px; bottom: 64px; }
+  .container-slots.chest { grid-template-columns: repeat(9, 36px); }
+  .container-slots.furnace .slot { width: 52px; height: 52px; }
+}

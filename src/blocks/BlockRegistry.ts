@@ -12,35 +12,17 @@ export const BlockIds = {
   GLASS: 7,
   PLANKS: 8,
   CRAFTING_TABLE: 9,
+  FURNACE: 10,
+  CHEST: 11,
 } as const;
 
 export class BlockRegistry {
   private readonly blocks = new Map<number, BlockDefinition>();
-
-  register(block: BlockDefinition): this {
-    validateBlockDefinition(block);
-    if (this.blocks.has(block.id)) throw new Error(`Block id ${block.id} is already registered.`);
-    this.blocks.set(block.id, Object.freeze({ ...block }));
-    return this;
-  }
-
-  has(id: number): boolean {
-    return this.blocks.has(id);
-  }
-
-  get(id: number): BlockDefinition {
-    const block = this.blocks.get(id);
-    if (!block) throw new RangeError(`Unknown block id: ${id}.`);
-    return block;
-  }
-
-  isAir(id: number): boolean {
-    return id === BlockIds.AIR;
-  }
-
-  get size(): number {
-    return this.blocks.size;
-  }
+  register(block: BlockDefinition): this { validateBlockDefinition(block); if (this.blocks.has(block.id)) throw new Error(`Block id ${block.id} is already registered.`); this.blocks.set(block.id, Object.freeze({ ...block })); return this; }
+  has(id: number): boolean { return this.blocks.has(id); }
+  get(id: number): BlockDefinition { const block = this.blocks.get(id); if (!block) throw new RangeError(`Unknown block id: ${id}.`); return block; }
+  isAir(id: number): boolean { return id === BlockIds.AIR; }
+  get size(): number { return this.blocks.size; }
 }
 
 export function createDefaultBlockRegistry(): BlockRegistry {
@@ -54,5 +36,7 @@ export function createDefaultBlockRegistry(): BlockRegistry {
     .register({ id: BlockIds.LEAVES, name: 'Leaves', solid: true, opaque: false, hardness: 0.3, color: 0x4f7f43, placeable: true, preferredTool: 'axe' })
     .register({ id: BlockIds.GLASS, name: 'Glass', solid: true, opaque: false, hardness: 0.3, color: 0xb7d6df, placeable: true })
     .register({ id: BlockIds.PLANKS, name: 'Wooden Planks', solid: true, opaque: true, hardness: 2.0, color: 0xb98752, placeable: true, preferredTool: 'axe' })
-    .register({ id: BlockIds.CRAFTING_TABLE, name: 'Crafting Table', solid: true, opaque: true, hardness: 2.5, color: 0x9b693d, placeable: true, preferredTool: 'axe' });
+    .register({ id: BlockIds.CRAFTING_TABLE, name: 'Crafting Table', solid: true, opaque: true, hardness: 2.5, color: 0x9b693d, placeable: true, preferredTool: 'axe' })
+    .register({ id: BlockIds.FURNACE, name: 'Furnace', solid: true, opaque: true, hardness: 3.5, color: 0x696d70, placeable: true, preferredTool: 'pickaxe' })
+    .register({ id: BlockIds.CHEST, name: 'Chest', solid: true, opaque: true, hardness: 2.5, color: 0xa8733f, placeable: true, preferredTool: 'axe' });
 }

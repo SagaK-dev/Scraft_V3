@@ -8,30 +8,9 @@ import { validateRecipe } from './CraftingRecipe.ts';
 export class CraftingRegistry {
   private readonly recipes: CraftingRecipe[] = [];
   private readonly ids = new Set<string>();
-
-  register(recipe: CraftingRecipe): this {
-    validateRecipe(recipe);
-    if (this.ids.has(recipe.id)) throw new Error(`Recipe ${recipe.id} is already registered.`);
-    this.ids.add(recipe.id);
-    this.recipes.push(Object.freeze({ ...recipe, pattern: Object.freeze([...recipe.pattern]), output: Object.freeze({ ...recipe.output }) }));
-    return this;
-  }
-
-  findMatch(grid: CraftingGrid): RecipeMatch | null {
-    for (const recipe of this.recipes) {
-      const direct = matchRecipe(grid, recipe, false);
-      if (direct) return { recipe, consumedSlots: direct };
-      if (recipe.allowMirror && recipe.width > 1) {
-        const mirrored = matchRecipe(grid, recipe, true);
-        if (mirrored) return { recipe, consumedSlots: mirrored };
-      }
-    }
-    return null;
-  }
-
-  get size(): number {
-    return this.recipes.length;
-  }
+  register(recipe: CraftingRecipe): this { validateRecipe(recipe); if (this.ids.has(recipe.id)) throw new Error(`Recipe ${recipe.id} is already registered.`); this.ids.add(recipe.id); this.recipes.push(Object.freeze({ ...recipe, pattern: Object.freeze([...recipe.pattern]), output: Object.freeze({ ...recipe.output }) })); return this; }
+  findMatch(grid: CraftingGrid): RecipeMatch | null { for (const recipe of this.recipes) { const direct = matchRecipe(grid, recipe, false); if (direct) return { recipe, consumedSlots: direct }; if (recipe.allowMirror && recipe.width > 1) { const mirrored = matchRecipe(grid, recipe, true); if (mirrored) return { recipe, consumedSlots: mirrored }; } } return null; }
+  get size(): number { return this.recipes.length; }
 }
 
 function matchRecipe(grid: CraftingGrid, recipe: CraftingRecipe, mirror: boolean): number[] | null {
@@ -46,19 +25,13 @@ function matchRecipe(grid: CraftingGrid, recipe: CraftingRecipe, mirror: boolean
           let expected: number | null = null;
           if (inside) {
             const recipeX = mirror ? recipe.width - 1 - (gridX - offsetX) : gridX - offsetX;
-            const recipeY = gridY - offsetY;
-            expected = recipe.pattern[recipeY * recipe.width + recipeX] ?? null;
+            expected = recipe.pattern[(gridY - offsetY) * recipe.width + recipeX] ?? null;
           }
           const index = gridY * grid.width + gridX;
           const actual = grid.get(index);
-          if (expected === null) {
-            if (actual !== null) { valid = false; break; }
-          } else if (actual?.itemId === expected) {
-            consumed.push(index);
-          } else {
-            valid = false;
-            break;
-          }
+          if (expected === null) { if (actual !== null) { valid = false; break; } }
+          else if (actual?.itemId === expected) consumed.push(index);
+          else { valid = false; break; }
         }
       }
       if (valid) return consumed;
@@ -75,5 +48,7 @@ export function createDefaultCraftingRegistry(items: ItemRegistry): CraftingRegi
     .register({ id: 'wooden_pickaxe', width: 3, height: 3, pattern: [ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS, null, ItemIds.STICK, null, null, ItemIds.STICK, null], output: createStack(items, ItemIds.WOODEN_PICKAXE), allowMirror: false })
     .register({ id: 'wooden_axe', width: 2, height: 3, pattern: [ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.STICK, null, ItemIds.STICK], output: createStack(items, ItemIds.WOODEN_AXE), allowMirror: true })
     .register({ id: 'wooden_shovel', width: 1, height: 3, pattern: [ItemIds.PLANKS, ItemIds.STICK, ItemIds.STICK], output: createStack(items, ItemIds.WOODEN_SHOVEL), allowMirror: false })
-    .register({ id: 'stone_pickaxe', width: 3, height: 3, pattern: [ItemIds.STONE, ItemIds.STONE, ItemIds.STONE, null, ItemIds.STICK, null, null, ItemIds.STICK, null], output: createStack(items, ItemIds.STONE_PICKAXE), allowMirror: false });
+    .register({ id: 'stone_pickaxe', width: 3, height: 3, pattern: [ItemIds.STONE, ItemIds.STONE, ItemIds.STONE, null, ItemIds.STICK, null, null, ItemIds.STICK, null], output: createStack(items, ItemIds.STONE_PICKAXE), allowMirror: false })
+    .register({ id: 'furnace', width: 3, height: 3, pattern: [ItemIds.STONE, ItemIds.STONE, ItemIds.STONE, ItemIds.STONE, null, ItemIds.STONE, ItemIds.STONE, ItemIds.STONE, ItemIds.STONE], output: createStack(items, ItemIds.FURNACE), allowMirror: false })
+    .register({ id: 'chest', width: 3, height: 3, pattern: [ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS, null, ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS, ItemIds.PLANKS], output: createStack(items, ItemIds.CHEST), allowMirror: false });
 }
