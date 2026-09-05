@@ -46,7 +46,7 @@ export class WorldGenerator {
     height = Math.round(Math.min(CHUNK_MAX_Y - 12, Math.max(CHUNK_MIN_Y + 5, height)));
 
     const climate = sampleBiome(worldX, worldZ, height, this.numericSeed);
-    let surfaceBlockId = BlockIds.GRASS;
+    let surfaceBlockId: number = BlockIds.GRASS;
     if (climate.kind === 'desert') surfaceBlockId = BlockIds.SAND;
     else if (climate.kind === 'alpine') surfaceBlockId = height > 45 || climate.temperature < -0.72 ? BlockIds.SNOW : BlockIds.STONE;
     else if (height > 38 && ridges > 0.73) surfaceBlockId = BlockIds.STONE;
