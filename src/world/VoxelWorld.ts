@@ -5,7 +5,7 @@ import { intersectsUnitBlock } from '../player/aabb';
 import { ChunkStreamer } from './ChunkStreamer';
 import { ChunkManager, chunkKey } from './ChunkManager';
 import { buildChunkMeshData } from './ChunkMesher';
-import { CHUNK_SIZE } from './coordinates';
+import { CHUNK_MAX_Y, CHUNK_MIN_Y, CHUNK_SIZE, splitCoordinate } from './coordinates';
 import { raycastVoxels, type Vec3Like, type VoxelHit } from './VoxelRaycast';
 import { WorldEditStore } from './WorldEdits';
 import { WorldGenerator } from './WorldGenerator';
@@ -29,6 +29,7 @@ export class VoxelWorld {
   private readonly edits = new WorldEditStore();
   private readonly generator: WorldGenerator;
   private readonly streamer: ChunkStreamer;
+  private physicsCenterKey = '';
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -63,7 +64,46 @@ export class VoxelWorld {
   }
 
   updateStreaming(worldX: number, worldZ: number, renderDistance: number): void {
+    this.ensurePhysicsNeighborhood(worldX, worldZ);
     this.streamer.update(worldX, worldZ, renderDistance);
+  }
+
+  ensurePhysicsNeighborhood(worldX: number, worldZ: number, radius = 1): void {
+    if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) throw new RangeError('Physics neighborhood coordinates must be finite.');
+    if (!Number.isInteger(radius) || radius < 0 || radius > 2) throw new RangeError('Physics neighborhood radius must be an integer from 0 to 2.');
+    const centerX = splitCoordinate(worldX).chunk;
+    const centerZ = splitCoordinate(worldZ).chunk;
+    const centerKey = `${centerX},${centerZ},${radius}`;
+    if (centerKey === this.physicsCenterKey) return;
+    this.physicsCenterKey = centerKey;
+
+    let changed = false;
+    for (let dz = -radius; dz <= radius; dz += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const chunkX = centerX + dx;
+        const chunkZ = centerZ + dz;
+        if (this.chunks.hasChunk(chunkX, chunkZ)) continue;
+        const chunk = this.generator.generateChunk(chunkX, chunkZ);
+        this.edits.applyToChunk(chunk);
+        this.chunks.add(chunk);
+        changed = true;
+      }
+    }
+    if (changed) this.rebuildDirtyMeshes();
+  }
+
+  getSurfaceHeight(worldX: number, worldZ: number): number {
+    return this.generator.sampleTerrain(worldX, worldZ).height;
+  }
+
+  isSolidBlock(x: number, y: number, z: number): boolean {
+    if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) throw new TypeError('Collision block coordinates must be integers.');
+    if (y < CHUNK_MIN_Y) return true;
+    if (y > CHUNK_MAX_Y) return false;
+    const chunkX = splitCoordinate(x).chunk;
+    const chunkZ = splitCoordinate(z).chunk;
+    if (!this.chunks.hasChunk(chunkX, chunkZ)) return true;
+    return this.blocks.get(this.chunks.getBlock(x, y, z)).solid;
   }
 
   raycast(origin: Vec3Like, direction: Vec3Like, maxDistance = INTERACTION_DISTANCE): VoxelHit | null {
@@ -114,7 +154,6 @@ export class VoxelWorld {
         existing.geometry.dispose();
         this.meshes.delete(key);
       }
-
       const [xText, zText] = key.split(',');
       const chunkX = Number(xText);
       const chunkZ = Number(zText);
@@ -122,7 +161,6 @@ export class VoxelWorld {
       if (!chunk) continue;
       const data = buildChunkMeshData(chunk, this.chunks, this.blocks);
       if (data.indices.length === 0) continue;
-
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
       geometry.setAttribute('normal', new THREE.BufferAttribute(data.normals, 3));
@@ -130,7 +168,6 @@ export class VoxelWorld {
       geometry.setIndex(new THREE.BufferAttribute(data.indices, 1));
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
-
       const mesh = new THREE.Mesh(geometry, this.material);
       mesh.name = `chunk-${key}`;
       mesh.position.set(chunk.x * CHUNK_SIZE, 0, chunk.z * CHUNK_SIZE);
@@ -153,17 +190,9 @@ export class VoxelWorld {
     (this.outline.material as THREE.Material).dispose();
   }
 
-  get loadedChunkCount(): number {
-    return this.chunks.size;
-  }
-
-  get pendingChunkCount(): number {
-    return this.streamer.pendingCount;
-  }
-
-  get runtimeEditCount(): number {
-    return this.edits.size;
-  }
+  get loadedChunkCount(): number { return this.chunks.size; }
+  get pendingChunkCount(): number { return this.streamer.pendingCount; }
+  get runtimeEditCount(): number { return this.edits.size; }
 
   private createOutline(): THREE.LineSegments {
     const box = new THREE.BoxGeometry(1, 1, 1);

@@ -12,9 +12,9 @@ Block/BlockRegistry、Chunk/ChunkManager、Uint16Array voxel storage、visible-f
 
 Seeded Value Noise / fBM / Ridged Noise / Domain Warp、決定的terrain生成、player-follow load/unload、Render Distance、nearest-first非同期生成キュー、runtime edit再適用を実装済み。
 
-## Phase 4 — Player physics
+## Phase 4 — Player physics ✅
 
-Voxel AABB collision、gravity、jump、sprint/crouch、step handling、water motion、fall tracking、anti-tunneling。
+Voxel AABB collision、gravity、jump、sprint/crouch、one-block step handling、fall tracking、ceiling/wall/ground detection、crouch edge safety、swept anti-tunnelingを実装済み。水中移動はPhase 8のwater実装後に接続する。
 
 ## Phase 5 — Items / Inventory / Crafting
 
@@ -38,7 +38,7 @@ IndexedDB world list、seed+delta save、player/inventory/chest/time save、load
 
 ## Phase 10 — Optimization
 
-Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning.
+Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning。
 
 ## Completion rule for every phase
 

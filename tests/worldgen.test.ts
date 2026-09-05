@@ -46,10 +46,9 @@ test('different seeds produce different remote terrain', () => {
   assert.notDeepEqual(samplesA, samplesB);
 });
 
-test('spawn area is deliberately flattened for Phase 3 compatibility', () => {
-  const generator = new WorldGenerator('spawn-test');
-  assert.equal(generator.sampleTerrain(0, 0).height, -1);
-  assert.equal(generator.sampleTerrain(12, -8).height, -1);
+test('spawn terrain is no longer forced flat now that voxel physics is available', () => {
+  const heights = ['spawn-a', 'spawn-b', 'spawn-c'].map(seed => new WorldGenerator(seed).sampleTerrain(0, 6).height);
+  assert.ok(new Set(heights).size > 1);
 });
 
 test('chunk generation is deterministic and places a valid surface', () => {
@@ -57,7 +56,6 @@ test('chunk generation is deterministic and places a valid surface', () => {
   const first = generator.generateChunk(-2, 3);
   const second = generator.generateChunk(-2, 3);
   assert.deepEqual(first.voxels, second.voxels);
-
   const worldX = -2 * 16 + 7;
   const worldZ = 3 * 16 + 11;
   const sample = generator.sampleTerrain(worldX, worldZ);
@@ -80,7 +78,6 @@ test('chunk streamer generates asynchronously nearest-first', async () => {
     generated.push(`${x},${z}`);
     return new Chunk(x, z);
   }, { chunksPerSlice: 1, unloadPadding: 0 });
-
   streamer.update(0, 0, 1);
   assert.equal(manager.size, 0);
   assert.equal(streamer.pendingCount, 9);
@@ -118,7 +115,6 @@ test('runtime edits can be reapplied after a chunk unload/regeneration', () => {
   const sample = generator.sampleTerrain(1, 1);
   edits.record(1, sample.height, 1, BlockIds.AIR);
   edits.record(2, sample.height + 3, 1, BlockIds.DIRT);
-
   const regenerated = generator.generateChunk(0, 0);
   assert.equal(edits.applyToChunk(regenerated), 2);
   assert.equal(regenerated.get(1, worldYToLocal(sample.height), 1), BlockIds.AIR);

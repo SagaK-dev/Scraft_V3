@@ -1,68 +1,64 @@
-# Phase 3 Review
+# Phase 4 Review
 
 ## Scope
 
-Phase 3 replaces the fixed Phase 2 test area with deterministic seeded terrain and player-following chunk streaming while preserving Phase 2 raycast, break/place and remeshing behavior.
+Phase 4 replaces the temporary Phase 1 Y=0 floor clamp with real voxel collision against the streamed Phase 3 world. Player motion, crouching, jumping, falling and step handling now use world block data.
 
 ## Implemented
 
-- string seed -> deterministic uint32 hash
-- seeded 2D value noise
-- fBM and ridged fBM
-- domain-warped terrain sampling
-- grass / sand / exposed-stone surface selection
-- hills and mountain ranges with bounded world height
-- deterministic `WorldGenerator.generateChunk(chunkX, chunkZ)`
-- URL query seed selection via `?seed=...`
-- render-distance target planning
-- nearest-first asynchronous chunk generation queue
-- player chunk tracking including negative coordinates
-- unload hysteresis padding
-- dirty-neighbor remeshing when chunks enter/leave the loaded set
-- session-local block edit cache reapplied after unload/regeneration
-- generation retry with bounded failure count
-- F3 seed / render distance / loaded / pending / runtime-edit diagnostics
+- standing player AABB: 0.6 x 1.8 x 0.6
+- crouched AABB: 0.6 x 1.5 x 0.6
+- standing/crouched eye-height switching while preserving feet position
+- Shift crouch and reduced crouch speed
+- blocked stand-up when ceiling space is occupied
+- gravity and terminal velocity
+- grounded / wall / ceiling collision detection
+- jumping from voxel surfaces
+- swept axis collision over the full movement path
+- high-speed anti-tunneling against one-block-thick walls/floors/ceilings
+- one-block terrain auto-step while grounded and standing
+- crouch edge protection by retaining support under the player
+- fall-distance tracking for future Phase 6 fall damage
+- dynamic spawn placement on top of generated terrain
+- removal of the Phase 3 forced-flat spawn terrain workaround
+- synchronous 3x3 physics safety neighborhood around the current player chunk
+- Phase 3 Render Distance streaming remains asynchronous outside that safety neighborhood
+- F3 grounded/crouched/fall-distance diagnostics
 
 ## Review findings and fixes
 
-- **Stale queue priority after moving**: pending targets are rebuilt whenever the player changes chunk or Render Distance, so nearest-first ordering always uses the current center.
-- **Transient generation failure could become permanent**: failed jobs now retry up to two times before reporting an error.
-- **Retry-state growth**: retry state is cleared when the stream plan changes and after successful generation.
-- **Unloaded player edits would disappear**: break/place operations are stored in `WorldEditStore` and reapplied when a deterministic chunk is regenerated.
-- **Chunk-border visuals during streaming**: `ChunkManager.add/remove` dirty adjacent chunks so exposed boundary faces are rebuilt when neighbors appear or disappear.
-- **Spawn vs Phase 1 floor collision**: the inner spawn region is blended toward Y=-1 until Phase 4 replaces the temporary Y=0 floor clamp with real voxel collision.
-- **Main-thread burst risk**: Phase 3 generates one chunk per scheduled task and yields between jobs. Web Worker terrain/meshing remains a Phase 10 optimization boundary.
+- **Generated terrain vs temporary floor mismatch**: removed the hardcoded floor clamp and place the player one block above the deterministic generated surface.
+- **High-speed tunneling**: collision scans the swept broadphase and clamps axis displacement at the earliest solid voxel face instead of testing only the destination AABB.
+- **Falling before async spawn chunks arrive**: the immediate 3x3 chunk neighborhood is generated synchronously before physics starts; the rest of Render Distance remains on the Phase 3 asynchronous queue.
+- **Unloaded boundary safety**: collision treats a missing chunk as solid. The 3x3 safety neighborhood prevents normal movement from seeing those temporary barriers while protecting against falling into unloaded space.
+- **Standing inside ceilings after crouch**: uncrouch first checks the full standing AABB and remains crouched when blocked.
+- **Crouch walking off ledges**: grounded crouch motion is binary-clamped to the furthest supported position.
+- **Natural one-block terrain becoming tedious**: grounded standing movement can auto-step one full voxel when headroom exists; two-block walls still block movement.
+- **Fall state leaking across landings**: fall distance resets on landing while the last landed distance is retained for the future survival/damage layer.
 
 ## Automated verification
 
-40 tests pass locally: the existing 27 Phase 1/2 tests plus 13 Phase 3 tests covering:
+45 tests pass locally: the existing 40 Phase 1-3 tests plus 5 Phase 4 physics tests covering:
 
-- seed hashing determinism
-- seeded noise determinism and bounds
-- query-string seed parsing
-- identical terrain from identical seeds
-- different terrain from different seeds
-- spawn flattening
-- deterministic chunk voxel content
-- generated surface/depth material correctness
-- Render Distance target planning
-- asynchronous nearest-first generation
-- negative player/chunk coordinates
-- moving-center unload/reload behavior
-- runtime edit reapplication
-- transient generation failure retry
+- falling onto a voxel floor and becoming grounded
+- ceiling collision
+- swept anti-tunneling across a 5-block horizontal motion
+- one-block auto-step
+- crouch-style supported ledge movement
 
-CI additionally runs dependency installation, strict TypeScript checking, all tests, Vite production build and high-severity npm audit.
+Existing world-generation tests were updated so spawn terrain is no longer required to be artificially fixed at Y=-1.
+
+CI additionally installs dependencies, runs strict TypeScript checking, all tests, Vite production build and high-severity npm audit.
 
 ## Known limitations
 
-- Phase 3 async generation is cooperative event-loop scheduling, not a Web Worker. Each chunk generation still uses the main JS thread for that individual job; Worker terrain/meshing is planned for Phase 10.
-- Full Voxel AABB player collision is Phase 4. Away from the flattened spawn area, the temporary Phase 1 floor clamp can visually disagree with generated terrain height.
-- Biomes, caves, ore veins, trees/plants, water and lighting remain Phase 8 work.
-- Runtime edits survive unload/reload only for the current page session. IndexedDB persistence is Phase 9.
-- Render Distance 16-24 is accepted but has not yet received Phase 10 memory/FPS tuning; the default remains 8.
-- Texture Atlas and transparent render passes are not part of this phase.
+- Fall distance is tracked but fall damage belongs to Phase 6 with HP/survival state.
+- Water/swimming physics waits for the Phase 8 water implementation.
+- Crouch currently changes stance/eye height and edge safety; crawling/prone poses are not implemented.
+- The one-block auto-step is intentionally generous for current full-block natural terrain. When slabs/stairs are added, collision shapes and step policy should become shape-aware.
+- The physics safety ring synchronously generates at most 3x3 chunks around the player when entering a new chunk; distant chunks still use cooperative asynchronous generation. Web Worker terrain/meshing remains Phase 10.
+- Browser/GPU feel, real FPS and long-session movement still require an interactive browser run.
 
-## Phase 4 readiness
+## Phase 5 readiness
 
-World access now has a stable loaded-chunk boundary and deterministic block queries. Phase 4 can replace the temporary floor clamp with voxel AABB collision without changing world generation or stream ownership.
+Player location, collision bounds, grounded/crouched state and stable block interaction now share the same voxel world. Phase 5 can add ItemRegistry, hotbar/inventory/crafting/tools without relying on the old flat-floor compatibility path.

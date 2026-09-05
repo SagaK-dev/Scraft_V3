@@ -6,21 +6,21 @@ Minecraftの公式テクスチャ、音声、コード、ロゴ等は使用し�
 
 ## 現在の状態
 
-Phase 3: Seed付きワールド生成とチャンクストリーミングまで実装済みです。
+Phase 4: Voxel AABBプレイヤー物理まで実装済みです。
 
 - Phase 1のThree.js / WebGL2 / FPS視点 / 固定60Hz更新 / 設定 / F3 / CI
 - Phase 2のBlock / Chunk / Uint16Array / meshing / Raycast / break / place
-- 文字列Seedを32bit値へ決定的に変換
-- Seeded Value Noise / fBM / Ridged Noise / Domain Warp
-- 草地・砂地・岩肌を含む丘陵〜山岳の自然地形
-- 同じSeed + 同じ座標 = 同じチャンクの決定的生成
-- プレイヤーのチャンク移動に追従するロード / アンロード
-- Render Distance設定を実際のストリーミング半径へ反映
-- 近いチャンクを優先する非同期生成キュー
-- アンロードの境界揺れを抑えるhysteresis padding
-- チャンク生成失敗の制限付き再試行
-- チャンクアンロード後もセッション中の破壊・設置差分を再適用
-- F3にSeed / Render Distance / loaded / pending / runtime editsを表示
+- Phase 3のSeeded Noise地形 / 決定的生成 / player-follow chunk streaming / Render Distance
+- 立位0.6 x 1.8 x 0.6、しゃがみ0.6 x 1.5 x 0.6のVoxel AABB
+- 地面・壁・天井のsolid block衝突
+- 重力 / ジャンプ / 落下 / terminal velocity
+- 移動経路全体を走査するswept collisionによる壁抜け防止
+- 1ブロック自然地形のauto-step
+- Shiftしゃがみ、低速移動、天井下での立ち上がり防止、崖端落下抑制
+- Fall distance追跡（ダメージ適用はPhase 6）
+- Seed地形の実際の表面へ動的スポーン
+- Player周囲3x3のphysics safety chunkを同期確保し、遠距離はPhase 3の非同期生成を維持
+- F3にgrounded / crouched / fall distanceを追加
 
 SeedはURLクエリで変更できます。
 
@@ -30,7 +30,7 @@ SeedはURLクエリで変更できます。
 
 例: `http://localhost:5173/?seed=mountain-test`
 
-Phase 4ではプレイヤーの本格的なVoxel AABB衝突、段差、落下、壁抜け対策を追加します。
+Phase 5ではItemRegistry、Hotbar、Inventory、Crafting、Tools/Durabilityへ進みます。
 
 ## 開発
 
@@ -55,6 +55,7 @@ Node.js 22.12以上を使用してください。
 - WASD: 移動
 - Space: ジャンプ
 - Ctrl: ダッシュ
+- Shift: しゃがみ
 - マウス: 視点
 - 左クリック長押し: ブロック破壊
 - 右クリック: Dirt設置

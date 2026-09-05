@@ -25,9 +25,9 @@ export class HUD {
       <div class="overlay">
         <section class="menu-panel" aria-label="Game menu">
           <h1>Scraft V3</h1>
-          <p class="subtitle">Phase 3 — Seeded terrain and chunk streaming</p>
+          <p class="subtitle">Phase 4 — Voxel player physics</p>
           <button class="primary" data-action="start">ゲーム開始 / 再開</button>
-          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / 左長押し 破壊 / 右クリック Dirt設置 / F3 デバッグ / Esc 一時停止</div>
+          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / Shift しゃがみ / 左長押し 破壊 / 右クリック Dirt設置 / F3 デバッグ / Esc 一時停止</div>
           <details>
             <summary>設定</summary>
             <label>FOV <output data-output="fov"></output><input data-setting="fov" type="range" min="50" max="110" step="1"></label>
@@ -56,27 +56,11 @@ export class HUD {
     this.bindSettings(settings);
   }
 
-  onStart(handler: () => void): void {
-    this.startHandler = handler;
-  }
-
-  setPlaying(playing: boolean): void {
-    this.overlay.hidden = playing;
-  }
-
-  setInteraction(text: string): void {
-    this.interaction.textContent = text;
-    this.interaction.hidden = text.length === 0;
-  }
-
-  toggleDebug(): void {
-    this.debugVisible = !this.debugVisible;
-    this.debug.hidden = !this.debugVisible;
-  }
-
-  updateDebug(text: string): void {
-    this.debug.textContent = text;
-  }
+  onStart(handler: () => void): void { this.startHandler = handler; }
+  setPlaying(playing: boolean): void { this.overlay.hidden = playing; }
+  setInteraction(text: string): void { this.interaction.textContent = text; this.interaction.hidden = text.length === 0; }
+  toggleDebug(): void { this.debugVisible = !this.debugVisible; this.debug.hidden = !this.debugVisible; }
+  updateDebug(text: string): void { this.debug.textContent = text; }
 
   showMessage(text: string): void {
     this.message.textContent = text;
@@ -91,9 +75,7 @@ export class HUD {
     target.textContent = text;
   }
 
-  dispose(): void {
-    this.startHandler = undefined;
-  }
+  dispose(): void { this.startHandler = undefined; }
 
   private bindSettings(initial: GameSettings): void {
     let current = initial;

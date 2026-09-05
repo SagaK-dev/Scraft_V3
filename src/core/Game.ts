@@ -45,6 +45,10 @@ export class Game {
         seed: resolveWorldSeed(),
         onGenerationError: message => this.hud.showMessage(message),
       });
+      const spawnX = 0;
+      const spawnZ = 6;
+      this.world.ensurePhysicsNeighborhood(spawnX, spawnZ);
+      this.player.teleportToFeet(spawnX, this.world.getSurfaceHeight(spawnX, spawnZ) + 1, spawnZ);
       this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     } catch (error) {
       this.hud.fatal(error instanceof Error ? error.message : '描画を初期化できません。');
@@ -79,7 +83,10 @@ export class Game {
 
     const [dx, dy] = this.input.takeMouse();
     this.player.look(dx, dy, this.settings.sensitivity);
-    const alpha = this.input.locked ? this.clock.advance(delta, dt => this.player.update(dt, this.input)) : 1;
+    const alpha = this.input.locked ? this.clock.advance(delta, dt => {
+      this.world.ensurePhysicsNeighborhood(this.player.position.x, this.player.position.z);
+      this.player.update(dt, this.input, this.world);
+    }) : 1;
     this.player.render(this.renderer.camera, alpha, delta, this.settings, this.input.locked);
     this.world.updateStreaming(this.player.position.x, this.player.position.z, this.settings.renderDistance);
     this.updateVoxelInteraction(delta);
@@ -92,7 +99,7 @@ export class Game {
       const info = this.renderer.gl.info;
       const target = this.lastHit ? `${this.lastHit.x} / ${this.lastHit.y} / ${this.lastHit.z}` : 'none';
       this.hud.updateDebug([
-        'Scraft V3 / Phase 3',
+        'Scraft V3 / Phase 4',
         `FPS ${(this.statsFrames / Math.max(this.statsTime, 0.001)).toFixed(0)}`,
         `XYZ ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
         `Chunk XZ ${splitCoordinate(p.x).chunk} / ${splitCoordinate(p.z).chunk}`,
@@ -100,10 +107,11 @@ export class Game {
         `Render distance ${this.settings.renderDistance}`,
         `Chunks ${this.world.loadedChunkCount} loaded / ${this.world.pendingChunkCount} pending`,
         `Runtime edits ${this.world.runtimeEditCount}`,
+        `Physics ${this.player.isGrounded ? 'grounded' : 'airborne'} / ${this.player.isCrouched ? 'crouched' : 'standing'} / fall ${this.player.fallDistance.toFixed(2)}`,
         `Target ${target}`,
         `Triangles ${info.render.triangles} | Draw calls ${info.render.calls}`,
         `GPU resources ${info.memory.geometries} geometries / ${info.memory.textures} textures`,
-        'World: deterministic noise terrain + asynchronous streaming',
+        'World: voxel AABB physics + deterministic streamed terrain',
       ].join('\n'));
       this.statsTime = 0;
       this.statsFrames = 0;

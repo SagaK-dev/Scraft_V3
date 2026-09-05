@@ -34,11 +34,6 @@ export class WorldGenerator {
     const mountain = Math.max(0, ridges - 0.5) * 160 * mountainMask;
 
     let height = -4 + continentalness * 11 + hills * 7 + mountain;
-
-    // Keep the initial spawn area playable until Phase 4 replaces the temporary flat-floor collision.
-    const spawnDistance = Math.hypot(worldX, worldZ);
-    const spawnBlend = smoothstep(24, 72, spawnDistance);
-    height = lerp(-1, height, spawnBlend);
     height = Math.round(Math.min(CHUNK_MAX_Y - 8, Math.max(CHUNK_MIN_Y + 4, height)));
 
     const aridity = fbm2D(x * 0.0038 + 71, z * 0.0038 - 43, this.numericSeed ^ 0x9e3779b9, 4);
@@ -69,13 +64,4 @@ export class WorldGenerator {
     }
     return chunk;
   }
-}
-
-function smoothstep(edge0: number, edge1: number, value: number): number {
-  const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }
