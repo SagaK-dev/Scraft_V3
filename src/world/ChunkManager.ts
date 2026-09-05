@@ -103,7 +103,7 @@ export class ChunkManager {
   }
 
   private markDirtyWithNeighbors(chunkX: number, chunkZ: number): void {
-    this.dirty.add(chunkKey(chunkX, chunk.z));
+    this.dirty.add(chunkKey(chunkX, chunkZ));
     this.dirty.add(chunkKey(chunkX - 1, chunkZ));
     this.dirty.add(chunkKey(chunkX + 1, chunkZ));
     this.dirty.add(chunkKey(chunkX, chunkZ - 1));
