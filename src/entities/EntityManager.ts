@@ -358,10 +358,19 @@ export class EntityManager {
     this.mobs.delete(mob.id);
   }
 
-
   private nearExistingMob(x: number, y: number, z: number, radius: number): boolean {
     const radiusSq = radius * radius;
     for (const mob of this.mobs.values()) if (distanceSquared(mob.position, { x, y, z }) < radiusSq) return true;
     return false;
   }
+}
+
+function deterministicUnit(seed: number, entityId: number, cycle: number, salt: number): number {
+  let x = (seed ^ Math.imul(entityId + 1, 0x9e3779b1) ^ Math.imul(cycle + 1, salt)) >>> 0;
+  x ^= x >>> 16;
+  x = Math.imul(x, 0x7feb352d) >>> 0;
+  x ^= x >>> 15;
+  x = Math.imul(x, 0x846ca68b) >>> 0;
+  x ^= x >>> 16;
+  return (x >>> 0) / 0xffffffff;
 }
