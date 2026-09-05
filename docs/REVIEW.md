@@ -1,64 +1,76 @@
-# Phase 4 Review
+# Phase 5 Review
 
 ## Scope
 
-Phase 4 replaces the temporary Phase 1 Y=0 floor clamp with real voxel collision against the streamed Phase 3 world. Player motion, crouching, jumping, falling and step handling now use world block data.
+Phase 5 adds items, inventory, hotbar, crafting, block-item placement and tool durability on top of the Phase 4 voxel world and physics stack.
 
 ## Implemented
 
-- standing player AABB: 0.6 x 1.8 x 0.6
-- crouched AABB: 0.6 x 1.5 x 0.6
-- standing/crouched eye-height switching while preserving feet position
-- Shift crouch and reduced crouch speed
-- blocked stand-up when ceiling space is occupied
-- gravity and terminal velocity
-- grounded / wall / ceiling collision detection
-- jumping from voxel surfaces
-- swept axis collision over the full movement path
-- high-speed anti-tunneling against one-block-thick walls/floors/ceilings
-- one-block terrain auto-step while grounded and standing
-- crouch edge protection by retaining support under the player
-- fall-distance tracking for future Phase 6 fall damage
-- dynamic spawn placement on top of generated terrain
-- removal of the Phase 3 forced-flat spawn terrain workaround
-- synchronous 3x3 physics safety neighborhood around the current player chunk
-- Phase 3 Render Distance streaming remains asynchronous outside that safety neighborhood
-- F3 grounded/crouched/fall-distance diagnostics
+- numeric `ItemRegistry` with validation and block-item mapping
+- 14 initial items including block items, Stick and four tools
+- 9-slot Hotbar + 27-slot Main Inventory
+- max-stack enforcement and merge into partial stacks before empty slots
+- selected Hotbar slot via number keys and mouse wheel
+- item cursor left-click behavior
+- HTML drag/drop between inventory/crafting slots
+- right-click half pickup and one-item placement
+- Shift-click Hotbar/Main transfer
+- 2x2 Player Crafting
+- Crafting Table block + item
+- right-click Crafting Table to open 3x3 Crafting
+- shaped recipe matching with offsets and optional mirroring
+- Planks, Stick, Crafting Table, Wooden Pickaxe/Axe/Shovel and Stone Pickaxe recipes
+- recipe output capacity check before consuming ingredients
+- Shift-click craft-many
+- tool categories, mining speed and durability
+- durability bar in UI and tool destruction at zero durability
+- block break -> matching item collection into Inventory
+- selected placeable item -> block placement + stack consumption
+- crafting cursor/grid items returned to Inventory on close
+- F3 selected Hotbar item diagnostics
 
 ## Review findings and fixes
 
-- **Generated terrain vs temporary floor mismatch**: removed the hardcoded floor clamp and place the player one block above the deterministic generated surface.
-- **High-speed tunneling**: collision scans the swept broadphase and clamps axis displacement at the earliest solid voxel face instead of testing only the destination AABB.
-- **Falling before async spawn chunks arrive**: the immediate 3x3 chunk neighborhood is generated synchronously before physics starts; the rest of Render Distance remains on the Phase 3 asynchronous queue.
-- **Unloaded boundary safety**: collision treats a missing chunk as solid. The 3x3 safety neighborhood prevents normal movement from seeing those temporary barriers while protecting against falling into unloaded space.
-- **Standing inside ceilings after crouch**: uncrouch first checks the full standing AABB and remains crouched when blocked.
-- **Crouch walking off ledges**: grounded crouch motion is binary-clamped to the furthest supported position.
-- **Natural one-block terrain becoming tedious**: grounded standing movement can auto-step one full voxel when headroom exists; two-block walls still block movement.
-- **Fall state leaking across landings**: fall distance resets on landing while the last landed distance is retained for the future survival/damage layer.
+- **Crafting output could partially mutate inventory before discovering it was full**: `canFullyInsert` is checked before ingredients are consumed. Crafting now behaves transactionally for one recipe operation.
+- **Crafting grid state survived closing/reopening globally**: close now returns cursor and active grid inputs to Player Inventory. If they cannot fit, closing is refused rather than losing items.
+- **Game-owned tool-category switch would become brittle**: `preferredTool` is stored on Block definitions and `ToolLogic` computes speed from Block + Item data.
+- **Tool stack rules**: Item validation forces tools to maxStack 1 and rejects already-broken tool stacks.
+- **Right-click split count**: odd stacks use ceil for the held half and preserve the exact total count.
+- **Shift-click partial capacity**: the source retains the exact remainder when only part of a stack can move.
+- **Drag/drop incompatible items**: stacks swap rather than overwriting either side.
+- **Crafting close item-loss risk**: cursor return and crafting-input return are mandatory before the UI can close.
+- **Pause menu / Hotbar stacking**: pause overlay is layered above the always-rendered Hotbar; Inventory overlay remains above both.
+- **Phase 8 dependency for wood availability**: until trees exist, a temporary 8-Wood starter stack is provided solely so Phase 5 crafting can be exercised.
 
 ## Automated verification
 
-45 tests pass locally: the existing 40 Phase 1-3 tests plus 5 Phase 4 physics tests covering:
+57 tests pass locally: the previous 45 Phase 1-4 tests plus 12 Phase 5 tests covering:
 
-- falling onto a voxel floor and becoming grounded
-- ceiling collision
-- swept anti-tunneling across a 5-block horizontal motion
-- one-block auto-step
-- crouch-style supported ledge movement
+- ItemRegistry block/tool definitions
+- stack-limit validation
+- durability decrement and breakage
+- matching vs wrong-tool mining speed
+- stack merge + overflow into empty slot
+- Hotbar/Main Shift-click transfer
+- right-click half split and one-item placement
+- drag-style move/swap/merge
+- offset-independent 2x2 Wood -> Planks
+- 2x2 Crafting Table recipe
+- 3x3 Wooden Pickaxe recipe and 2x2 rejection
+- full-inventory craft rejection without consuming ingredients
+- inventory capacity edge behavior
 
-Existing world-generation tests were updated so spawn terrain is no longer required to be artificially fixed at Y=-1.
-
-CI additionally installs dependencies, runs strict TypeScript checking, all tests, Vite production build and high-severity npm audit.
+The Phase 5 pure TypeScript modules and Inventory UI also pass a strict standalone TypeScript check with `noUncheckedIndexedAccess` enabled. Full application typecheck/build is verified in GitHub Actions where Three.js dependencies are installed.
 
 ## Known limitations
 
-- Fall distance is tracked but fall damage belongs to Phase 6 with HP/survival state.
-- Water/swimming physics waits for the Phase 8 water implementation.
-- Crouch currently changes stance/eye height and edge safety; crawling/prone poses are not implemented.
-- The one-block auto-step is intentionally generous for current full-block natural terrain. When slabs/stairs are added, collision shapes and step policy should become shape-aware.
-- The physics safety ring synchronously generates at most 3x3 chunks around the player when entering a new chunk; distant chunks still use cooperative asynchronous generation. Web Worker terrain/meshing remains Phase 10.
-- Browser/GPU feel, real FPS and long-session movement still require an interactive browser run.
+- World item entities are Phase 7. When inventory is full, a broken block cannot yet spawn as a physical dropped entity and is reported as uncollected.
+- Natural Wood supply waits for Phase 8 vegetation, so Phase 5 currently grants 8 Wood at startup as a temporary test aid.
+- Crafting recipes are code-registered rather than external JSON; the registry boundary is designed so recipes can be data-driven later.
+- Tools currently affect mining time and durability but do not yet gate drops by tier; ore/tier requirements belong with Phase 8 ores and Phase 6/7 survival tuning.
+- Inventory and crafting state are session-only until Phase 9 IndexedDB persistence.
+- Browser pointer interactions and drag/drop feel still require interactive browser testing beyond unit/CI validation.
 
-## Phase 5 readiness
+## Phase 6 readiness
 
-Player location, collision bounds, grounded/crouched state and stable block interaction now share the same voxel world. Phase 5 can add ItemRegistry, hotbar/inventory/crafting/tools without relying on the old flat-floor compatibility path.
+Player inventory, tools and fall-distance state now exist, so Phase 6 can add HP, hunger, regeneration, fall damage, combat, day/night, audio, furnace and chest interactions without inventing a second item model.

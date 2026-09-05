@@ -16,9 +16,9 @@ Seeded Value Noise / fBM / Ridged Noise / Domain Warp、決定的terrain生成�
 
 Voxel AABB collision、gravity、jump、sprint/crouch、one-block step handling、fall tracking、ceiling/wall/ground detection、crouch edge safety、swept anti-tunnelingを実装済み。水中移動はPhase 8のwater実装後に接続する。
 
-## Phase 5 — Items / Inventory / Crafting
+## Phase 5 — Items / Inventory / Crafting ✅
 
-ItemRegistry、9-slot hotbar、inventory stacks、drag/drop、split、shift-click、2x2/3x3 recipes、tools、durability、crafting table。
+ItemRegistry、9-slot hotbar + 27-slot main inventory、stack merge/swap/split、drag/drop、right-click split、shift-click、2x2/3x3 shaped recipes、Crafting Table、tools、preferred-tool mining speed、durability、block pickup/placementを実装済み。
 
 ## Phase 6 — Survival
 
@@ -38,7 +38,7 @@ IndexedDB world list、seed+delta save、player/inventory/chest/time save、load
 
 ## Phase 10 — Optimization
 
-Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning。
+Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning.
 
 ## Completion rule for every phase
 

@@ -1,3 +1,5 @@
+export type BlockToolKind = 'pickaxe' | 'axe' | 'shovel';
+
 export interface BlockDefinition {
   readonly id: number;
   readonly name: string;
@@ -6,6 +8,7 @@ export interface BlockDefinition {
   readonly hardness: number;
   readonly color: number;
   readonly placeable: boolean;
+  readonly preferredTool?: BlockToolKind;
 }
 
 export const MAX_BLOCK_ID = 0xffff;

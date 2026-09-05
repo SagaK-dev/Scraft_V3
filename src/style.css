@@ -13,6 +13,7 @@ button, input { font: inherit; }
 
 .overlay {
   position: fixed;
+  z-index: 6;
   inset: 0;
   display: grid;
   place-items: center;
@@ -86,3 +87,94 @@ input[type="range"] { width: 100%; }
   pointer-events: none;
 }
 .interaction-status[hidden] { display: none; }
+
+.hotbar-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(9, 48px);
+  gap: 3px;
+  pointer-events: none;
+}
+
+.inventory-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  background: rgb(4 7 10 / 62%);
+  backdrop-filter: blur(3px);
+}
+.inventory-overlay[hidden] { display: none; }
+.inventory-panel {
+  width: min(94vw, 620px);
+  padding: 20px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 10px;
+  background: #202831;
+  box-shadow: 0 24px 90px rgb(0 0 0 / 55%);
+  user-select: none;
+}
+.inventory-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.inventory-header h2 { margin: 0; font-size: 20px; }
+.crafting-section { display: flex; align-items: center; justify-content: center; gap: 18px; min-height: 160px; margin-bottom: 18px; }
+.craft-grid { display: grid; gap: 4px; }
+.craft-arrow { font-size: 28px; color: #aebbc4; }
+.inventory-main { display: grid; grid-template-columns: repeat(9, 48px); gap: 4px; justify-content: center; margin-bottom: 14px; }
+.inventory-hotbar { display: grid; grid-template-columns: repeat(9, 48px); gap: 4px; justify-content: center; }
+.inventory-help { margin-top: 14px; color: #aebbc4; font-size: 11px; text-align: center; }
+.slot {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid #5b6570;
+  border-radius: 3px;
+  background: #303945;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.slot:hover { background: #3b4653; }
+.slot.selected { border-color: #f5f4df; box-shadow: 0 0 0 2px rgb(255 255 255 / 34%); }
+.hud-slot { background: rgb(24 30 37 / 86%); border-color: rgb(190 201 209 / 55%); }
+.item-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: #111;
+  font-weight: 900;
+  font-size: 17px;
+  text-shadow: 0 1px rgb(255 255 255 / 28%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%);
+}
+.stack-count { position: absolute; right: 3px; bottom: 1px; color: white; font: 700 14px/1 monospace; text-shadow: 1px 1px 2px #000; }
+.hotbar-key { position: absolute; left: 3px; top: 2px; color: #dbe3e8; font: 10px/1 monospace; text-shadow: 1px 1px #000; }
+.durability { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 4px; background: #171b20; }
+.durability::after { content: ''; display: block; width: var(--durability, 100%); height: 100%; background: #c8e36f; }
+.craft-output { flex: 0 0 auto; }
+.craft-output:disabled { opacity: .55; cursor: default; }
+.inventory-cursor {
+  position: fixed;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: rgb(20 24 29 / 84%);
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 4px;
+}
+.inventory-cursor[hidden] { display: none; }
+@media (max-width: 560px) {
+  .hotbar-hud, .inventory-main, .inventory-hotbar { grid-template-columns: repeat(9, 36px); }
+  .slot { width: 36px; height: 36px; }
+  .item-icon { width: 25px; height: 25px; font-size: 13px; }
+}

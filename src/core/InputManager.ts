@@ -9,6 +9,10 @@ export class InputManager {
   onLockChange?: (locked: boolean) => void;
   onError?: (message: string) => void;
   onDebugToggle?: () => void;
+  onInventoryToggle?: () => void;
+  onEscape?: () => void;
+  onHotbarSelect?: (index: number) => void;
+  onHotbarCycle?: (delta: number) => void;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     document.addEventListener('keydown', this.handleKeyDown);
@@ -20,6 +24,7 @@ export class InputManager {
     document.addEventListener('pointerlockerror', this.handlePointerLockError);
     window.addEventListener('blur', this.handleBlur);
     canvas.addEventListener('contextmenu', this.preventContextMenu);
+    canvas.addEventListener('wheel', this.handleWheel, { passive: false });
   }
 
   get locked(): boolean {
@@ -75,12 +80,28 @@ export class InputManager {
     document.removeEventListener('pointerlockerror', this.handlePointerLockError);
     window.removeEventListener('blur', this.handleBlur);
     this.canvas.removeEventListener('contextmenu', this.preventContextMenu);
+    this.canvas.removeEventListener('wheel', this.handleWheel);
   }
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
     if (event.code === 'F3') {
       event.preventDefault();
       if (!event.repeat) this.onDebugToggle?.();
+      return;
+    }
+    if (event.code === 'KeyE') {
+      event.preventDefault();
+      if (!event.repeat) this.onInventoryToggle?.();
+      return;
+    }
+    if (event.code === 'Escape') {
+      if (!event.repeat) this.onEscape?.();
+      return;
+    }
+    const hotbar = /^Digit([1-9])$/.exec(event.code);
+    if (hotbar) {
+      event.preventDefault();
+      if (!event.repeat) this.onHotbarSelect?.(Number(hotbar[1]) - 1);
       return;
     }
     if (this.locked) this.keys.add(event.code);
@@ -113,6 +134,12 @@ export class InputManager {
 
   private readonly handlePointerLockError = (): void => {
     this.onError?.('Pointer Lockを取得できませんでした。ブラウザ設定を確認してください。');
+  };
+
+  private readonly handleWheel = (event: WheelEvent): void => {
+    if (!this.locked || event.deltaY === 0) return;
+    event.preventDefault();
+    this.onHotbarCycle?.(event.deltaY);
   };
 
   private readonly handleBlur = (): void => this.pause();

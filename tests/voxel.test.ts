@@ -12,9 +12,10 @@ import { CHUNK_HEIGHT, CHUNK_MAX_Y, CHUNK_MIN_Y, localYToWorld, worldYToLocal } 
 const blocks = createDefaultBlockRegistry();
 
 test('default block registry contains required Phase 2 blocks', () => {
-  assert.equal(blocks.size, 8);
+  assert.equal(blocks.size, 10);
   assert.equal(blocks.get(BlockIds.AIR).solid, false);
   assert.equal(blocks.get(BlockIds.STONE).opaque, true);
+  assert.equal(blocks.get(BlockIds.STONE).preferredTool, 'pickaxe');
   assert.equal(blocks.get(BlockIds.LEAVES).opaque, false);
 });
 
