@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import type { InputManager } from '../core/InputManager';
 import type { GameSettings } from '../core/Settings';
+import type { AABB } from './aabb';
 import { moveTowards } from './movement';
 
 const EYE_HEIGHT = 1.62;
+const PLAYER_HEIGHT = 1.8;
+const PLAYER_HALF_WIDTH = 0.3;
 const WALK_SPEED = 4.3;
 const SPRINT_SPEED = 6.8;
 const JUMP_SPEED = 7.0;
@@ -60,6 +63,7 @@ export class PlayerController {
     this.velocity.y += GRAVITY * dt;
     this.position.addScaledVector(this.velocity, dt);
 
+    // Phase 4 replaces this test-floor clamp with voxel AABB collision resolution.
     if (this.position.y <= EYE_HEIGHT) {
       this.position.y = EYE_HEIGHT;
       if (this.velocity.y < 0) this.velocity.y = 0;
@@ -86,6 +90,18 @@ export class PlayerController {
     const targetFov = settings.fov + sprintFactor * 7;
     camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 10, frameDelta);
     camera.updateProjectionMatrix();
+  }
+
+  getBounds(): AABB {
+    const feetY = this.position.y - EYE_HEIGHT;
+    return {
+      minX: this.position.x - PLAYER_HALF_WIDTH,
+      minY: feetY,
+      minZ: this.position.z - PLAYER_HALF_WIDTH,
+      maxX: this.position.x + PLAYER_HALF_WIDTH,
+      maxY: feetY + PLAYER_HEIGHT,
+      maxZ: this.position.z + PLAYER_HALF_WIDTH,
+    };
   }
 
   sync(): void {

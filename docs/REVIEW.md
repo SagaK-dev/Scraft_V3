@@ -1,46 +1,64 @@
-# Phase 1 Review
+# Phase 2 Review
 
 ## Scope
 
-Phase 1 intentionally does not implement blocks/chunks. The green plane and grid are temporary test geometry used to validate camera movement and rendering lifecycle.
+Phase 2 adds the voxel data/rendering/interaction foundation on top of Phase 1. Terrain is intentionally a fixed 5x5 chunk test area; seeded generation and streaming remain Phase 3 work.
 
-## Review findings and applied fixes
+## Implemented
 
-- **Large-frame physics jump**: render delta is capped and simulation uses a fixed 60Hz accumulator with a maximum catch-up count.
-- **Fixed-step floating-point boundary**: tests exposed a 0.03/0.01 precision edge that could skip one update; the accumulator comparison now uses a scale-aware epsilon.
-- **Background-tab jump**: visibility changes reset the input state, accumulator, and previous frame timestamp.
-- **Stuck movement keys**: blur and pointer-lock release clear key state.
-- **Pointer Lock failure**: user-visible error path is present.
-- **Context loss**: WebGL context loss stops input and animation progression and displays a fatal message.
-- **GPU leaks**: Phase 1-owned geometry/materials are disposed; shared/future world resources are expected to own their own lifecycles.
-- **HiDPI runaway fill rate**: pixel ratio is capped at 2.
-- **Unsafe settings**: persisted values are sanitized and storage exceptions are contained.
-- **Negative coordinate trap**: coordinate helper uses floor division + positive modulo in preparation for Phase 2.
+- Block / BlockRegistry with stable numeric IDs, hardness, solid/opaque/placeable flags
+- 16x256x16 chunks using `Uint16Array`
+- world/chunk/local coordinate conversion including negative X/Z and Y range -64..191
+- ChunkManager with safe unloaded-chunk behavior and dirty tracking
+- chunk-level mesh generation with hidden-face culling
+- neighbor-chunk lookup at chunk borders
+- old BufferGeometry disposal before remesh
+- voxel DDA raycast
+- reusable selection outline
+- hold-to-break with per-block hardness and target-change reset
+- right-click placement
+- player-AABB placement rejection
+- adjacent-chunk remesh on border edits
 
-## Verification matrix
+## Review findings and fixes
 
-Automated local tests cover:
+- **Node test incompatibility**: strip-only TypeScript cannot execute constructor parameter properties; pure voxel test modules were kept strip-compatible.
+- **Transparent internal faces**: equal transparent block IDs now cull their shared face instead of generating duplicate interior geometry.
+- **Break/place same-frame race**: a right-click edge is consumed before break completion and ignored if the target is destroyed that frame, preventing placement against a stale hit.
+- **Break target identity**: break progress keys include block ID as well as XYZ, so replacing a block at the same coordinate resets progress.
+- **Chunk-border mesh invalidation**: edits at local X/Z 0 or 15 dirty the corresponding loaded neighbor.
+- **Unloaded writes**: ChunkManager refuses writes into missing chunks rather than inventing partial world data.
+- **Geometry lifetime**: every replaced chunk geometry is disposed before removal.
 
-1. fixed-step deterministic update count
-2. fixed-step catch-up cap
-3. negative chunk/local coordinate mapping
-4. invalid coordinate divisor/modulus rejection
-5. settings clamping
-6. storage failure handling
-7. moveTowards no-overshoot
-8. moveTowards positive/negative direction
-9. moveTowards stable equality
-10. moveTowards invalid maxDelta rejection
+## Automated verification
 
-CI additionally installs dependencies, runs strict TypeScript checking, executes tests, builds with Vite, and performs an npm high-severity audit.
+27 tests currently pass locally. Phase 2 coverage includes:
+
+- required BlockRegistry definitions and duplicate-ID rejection
+- Uint16 chunk capacity
+- full world/local Y conversion range
+- negative-coordinate read/write
+- unloaded-chunk write rejection
+- boundary dirty propagation
+- 6-face single voxel mesh
+- same-chunk hidden-face culling
+- cross-chunk hidden-face culling
+- transparent-neighbor behavior
+- positive and negative DDA raycast hit
+- max-distance raycast miss
+- player AABB placement overlap
+- break duration completion and target reset
+
+The original 10 Phase 1 tests remain in the same suite.
 
 ## Known limitations
 
-- Browser pointer-lock and actual frame-rate require a real browser/GPU run; unit tests cannot prove these.
-- Phase 1 collision is only a flat Y=0 floor. Voxel AABB collision belongs to Phase 4 after Phase 2 provides blocks.
-- Render Distance setting is stored now but becomes active with ChunkManager in Phase 3.
-- No textures/audio are included yet, avoiding accidental use of Minecraft assets.
+- Browser/GPU interaction and real FPS still require an actual browser run.
+- The Phase 2 world is a fixed 25-chunk flat test area. Phase 3 owns deterministic seed generation, load/unload and render-distance streaming.
+- Player movement still uses the Phase 1 flat-floor clamp. Full voxel AABB movement collision, step handling and anti-tunneling are Phase 4.
+- Phase 2 uses original vertex colors rather than a texture atlas. Atlas-backed block textures are an upcoming rendering extension; no Minecraft assets are used.
+- Leaves/glass have non-opaque culling semantics but are rendered by the shared opaque material in this phase; a transparent render pass belongs to later rendering work.
 
-## Phase 2 readiness
+## Phase 3 readiness
 
-`src/world/coordinates.ts` already establishes negative-coordinate semantics. The next phase should add BlockRegistry, Chunk, ChunkManager, ChunkMesher, VoxelRaycast and block interaction without making `Game` the owner of voxel details.
+World data, meshing and interaction are separated from `Game`. Chunk creation can therefore be replaced by a deterministic generator and streaming queue without changing raycast/break/place semantics.

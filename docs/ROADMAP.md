@@ -4,9 +4,9 @@
 
 Three.js / WebGL2、FPS camera、InputManager、fixed timestep、PlayerController、HUD/settings、debug overlay、CI/tests。
 
-## Phase 2 — Voxels
+## Phase 2 — Voxels ✅
 
-Block/BlockRegistry、Chunk/ChunkManager、TypedArray voxel storage、visible-face meshing、chunk-border neighbor lookup、voxel raycast、selection outline、break/place、player-overlap prevention、neighbor remesh。
+Block/BlockRegistry、Chunk/ChunkManager、Uint16Array voxel storage、visible-face meshing、chunk-border neighbor lookup、voxel raycast、selection outline、hold-to-break、right-click placement、player-overlap prevention、neighbor remeshを実装済み。
 
 ## Phase 3 — World generation
 
@@ -38,7 +38,7 @@ IndexedDB world list、seed+delta save、player/inventory/chest/time save、load
 
 ## Phase 10 — Optimization
 
-Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning.
+Worker terrain/meshing、Greedy Meshing、frustum/distance priority、cache/pooling、memory profiling、long-run tests、render-distance 8 baseline and 16–24 tuning。
 
 ## Completion rule for every phase
 

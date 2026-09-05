@@ -6,21 +6,24 @@ Minecraftの公式テクスチャ、音声、コード、ロゴ等は使用し�
 
 ## 現在の状態
 
-Phase 1: ゲーム基盤
+Phase 2: ボクセルシステムまで実装済みです。
 
-- Three.js / WebGL2 レンダリング
-- Pointer Lockを使ったFPS視点
-- WASD移動、Spaceジャンプ、Ctrlダッシュ
-- 固定60Hz物理更新 + requestAnimationFrame描画
-- FOV、マウス感度、描画距離、View Bob設定
-- localStorage設定保存
-- F3デバッグ表示
-- WebGL context loss、タブ非表示、blur時の安全停止
-- TypeScript strict設定
-- Node標準テスト
-- GitHub Actions CI
+- Phase 1のThree.js / WebGL2 / FPS視点 / 固定60Hz更新 / 設定 / F3 / CI
+- Block / BlockRegistry
+- 16 x 256 x 16 Chunk + `Uint16Array` voxel storage
+- ChunkManagerと負数ワールド座標対応
+- 見えている面だけを生成するチャンク単位BufferGeometry
+- 隣接チャンクを考慮した面カリング
+- チャンク境界編集時の隣接再メッシュ
+- DDA方式Voxel Raycast
+- 選択ブロックのアウトライン表示
+- 左クリック長押し破壊（Block hardness対応）
+- 右クリックによるDirt設置
+- プレイヤーAABBと重なる位置への設置防止
+- Geometry再生成時の旧Geometry dispose
+- Phase 2確認用の固定25チャンク平坦ワールド
 
-Phase 1では確認用の平面だけを描画します。ボクセル、チャンク、採掘、設置はPhase 2で実装します。
+Phase 3でSeed付き地形生成とチャンクストリーミングを追加します。プレイヤーとボクセルの本格的な衝突解決はPhase 4です。
 
 ## 開発
 
@@ -46,9 +49,11 @@ Node.js 22.12以上を使用してください。
 - Space: ジャンプ
 - Ctrl: ダッシュ
 - マウス: 視点
+- 左クリック長押し: ブロック破壊
+- 右クリック: Dirt設置
 - Esc: ポインターロック解除 / 一時停止
 - F3: デバッグ表示
 
 ## 設計
 
-詳細は `docs/ARCHITECTURE.md`、実装順は `docs/ROADMAP.md`、Phase 1レビューは `docs/REVIEW.md` を参照してください。
+詳細は `docs/ARCHITECTURE.md`、実装順は `docs/ROADMAP.md`、レビュー結果は `docs/REVIEW.md` を参照してください。

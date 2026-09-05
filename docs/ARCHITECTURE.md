@@ -2,7 +2,7 @@
 
 ## 目的
 
-長時間遊べるブラウザ向け3Dボクセル・サバイバルゲームを、段階的に実装できる構造にする。Phase 1では実行基盤だけを作り、Phase 2以降のWorld/Chunk/Block/EntityをGameへ直書きしない。
+長時間遊べるブラウザ向け3Dボクセル・サバイバルゲームを、段階的に実装できる構造にする。Phase 1で実行基盤、Phase 2でBlock/Chunk/Mesh/Raycast/Interactionを追加した。World/Chunk/Block/Entityの詳細はGameへ直書きせず、各サブシステムへ分離する。
 
 ## 技術基盤
 
@@ -20,9 +20,12 @@
 - `Renderer`: Scene / Camera / WebGLRenderer、画面サイズ、GPUリソース解放
 - `InputManager`: keyboard / mouse / pointer lock
 - `FixedStep`: 60Hz固定更新とspiral-of-death対策
-- `PlayerController`: Phase 1の移動・視点。Phase 4でWorld collisionとAABBへ拡張
-- `HUD`: DOM UI、設定、F3表示
-- `World`（Phase 2以降）: Block/Chunkへの唯一の高水準アクセスポイント
+- `PlayerController`: 移動・視点と設置判定用AABB。Phase 4でWorld collisionへ拡張
+- `HUD`: DOM UI、設定、F3表示、ブロック選択/破壊進行表示
+- `VoxelWorld`: ChunkManager / mesh / raycast / break / placeの高水準アクセスポイント
+- `ChunkManager`: Chunkの所有、world block access、dirty chunk tracking
+- `ChunkMesher`: Three.js非依存のmesh data生成
+- `BlockBreaker`: 長押し破壊進行の純粋ロジック
 
 ## ゲームループ
 
@@ -38,7 +41,7 @@
 
 タブ非表示やpointer lock解除時は入力とaccumulatorをリセットし、復帰直後の大deltaを持ち越さない。
 
-## チャンク設計（Phase 2〜3）
+## チャンク設計（Phase 2実装 / Phase 3拡張）
 
 標準チャンクは X=16, Z=16, Y=256。内部ボクセルは`Uint16Array(16*256*16)`を基本とする。Block IDは0をAIRとし、BlockRegistryから属性を引く。
 
@@ -49,7 +52,7 @@
 - world -> chunk: `Math.floor(block / 16)`
 - world -> local: positive modulo
 - 負数座標は `%` を直接利用しない
-- Chunk keyは文字列よりPacked integer/BigIntを計測比較し、Phase 3で決定
+- Phase 2のChunk keyは `"x,z"` 文字列。Phase 3の大量ストリーミング時にpacked keyとの計測比較を行う
 
 ## Blockデータ
 
@@ -71,12 +74,17 @@ BlockRegistryに以下を保持する。
 
 1ブロック=1Meshは禁止。チャンク単位の`BufferGeometry`を生成する。
 
-Phase 2:
+Phase 2実装:
 - 6面のneighbor確認
-- 空気/透過境界だけface生成
+- 空気/非opaque境界だけface生成
+- 同一透明Blockの内部面も除去
 - chunk edgeでは隣接chunkを照会
-- opaque / transparentを必要なら別drawに分離
 - geometry rebuild時に旧geometryをdispose
+- mesh data生成はThree.js非依存
+
+今後:
+- opaque / transparentを別drawに分離
+- Texture Atlas
 
 Phase 10:
 - Greedy Meshing

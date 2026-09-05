@@ -1,5 +1,7 @@
 export class InputManager {
   private readonly keys = new Set<string>();
+  private readonly mouseButtons = new Set<number>();
+  private readonly mousePressed = new Set<number>();
   private mouseX = 0;
   private mouseY = 0;
   private disposed = false;
@@ -12,6 +14,8 @@ export class InputManager {
     document.addEventListener('keydown', this.handleKeyDown);
     document.addEventListener('keyup', this.handleKeyUp);
     document.addEventListener('mousemove', this.handleMouseMove);
+    document.addEventListener('mousedown', this.handleMouseDown);
+    document.addEventListener('mouseup', this.handleMouseUp);
     document.addEventListener('pointerlockchange', this.handlePointerLockChange);
     document.addEventListener('pointerlockerror', this.handlePointerLockError);
     window.addEventListener('blur', this.handleBlur);
@@ -24,6 +28,16 @@ export class InputManager {
 
   isDown(code: string): boolean {
     return this.keys.has(code);
+  }
+
+  isMouseDown(button: number): boolean {
+    return this.mouseButtons.has(button);
+  }
+
+  consumeMousePress(button: number): boolean {
+    if (!this.mousePressed.has(button)) return false;
+    this.mousePressed.delete(button);
+    return true;
   }
 
   takeMouse(): readonly [number, number] {
@@ -44,9 +58,7 @@ export class InputManager {
   }
 
   pause(): void {
-    this.keys.clear();
-    this.mouseX = 0;
-    this.mouseY = 0;
+    this.clearTransientInput();
     if (this.locked) document.exitPointerLock();
   }
 
@@ -57,6 +69,8 @@ export class InputManager {
     document.removeEventListener('keydown', this.handleKeyDown);
     document.removeEventListener('keyup', this.handleKeyUp);
     document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mousedown', this.handleMouseDown);
+    document.removeEventListener('mouseup', this.handleMouseUp);
     document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
     document.removeEventListener('pointerlockerror', this.handlePointerLockError);
     window.removeEventListener('blur', this.handleBlur);
@@ -82,8 +96,18 @@ export class InputManager {
     this.mouseY += event.movementY;
   };
 
+  private readonly handleMouseDown = (event: MouseEvent): void => {
+    if (!this.locked) return;
+    if (!this.mouseButtons.has(event.button)) this.mousePressed.add(event.button);
+    this.mouseButtons.add(event.button);
+  };
+
+  private readonly handleMouseUp = (event: MouseEvent): void => {
+    this.mouseButtons.delete(event.button);
+  };
+
   private readonly handlePointerLockChange = (): void => {
-    if (!this.locked) this.keys.clear();
+    if (!this.locked) this.clearTransientInput();
     this.onLockChange?.(this.locked);
   };
 
@@ -93,4 +117,12 @@ export class InputManager {
 
   private readonly handleBlur = (): void => this.pause();
   private readonly preventContextMenu = (event: MouseEvent): void => event.preventDefault();
+
+  private clearTransientInput(): void {
+    this.keys.clear();
+    this.mouseButtons.clear();
+    this.mousePressed.clear();
+    this.mouseX = 0;
+    this.mouseY = 0;
+  }
 }

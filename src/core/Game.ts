@@ -1,10 +1,15 @@
+import * as THREE from 'three';
+import { BlockIds } from '../blocks/BlockRegistry';
+import { PlayerController } from '../player/PlayerController';
+import { HUD } from '../ui/HUD';
+import { BlockBreaker } from '../world/BlockBreaker';
+import type { VoxelHit } from '../world/VoxelRaycast';
+import { VoxelWorld } from '../world/VoxelWorld';
+import { splitCoordinate } from '../world/coordinates';
 import { FixedStep } from './FixedStep';
 import { InputManager } from './InputManager';
 import { Renderer } from './Renderer';
 import { loadSettings, saveSettings } from './Settings';
-import { PlayerController } from '../player/PlayerController';
-import { HUD } from '../ui/HUD';
-import { splitCoordinate } from '../world/coordinates';
 
 export class Game {
   private readonly hud: HUD;
@@ -12,6 +17,9 @@ export class Game {
   private readonly input: InputManager;
   private readonly player = new PlayerController();
   private readonly clock = new FixedStep();
+  private readonly breaker = new BlockBreaker();
+  private readonly lookDirection = new THREE.Vector3();
+  private readonly world: VoxelWorld;
   private settings = loadSettings();
   private frame = 0;
   private lastTime: number | undefined;
@@ -19,6 +27,7 @@ export class Game {
   private statsFrames = 0;
   private disposed = false;
   private contextLost = false;
+  private lastHit: VoxelHit | null = null;
 
   constructor(root: HTMLElement) {
     this.hud = new HUD(root, this.settings, settings => {
@@ -31,6 +40,7 @@ export class Game {
         this.contextLost = true;
         this.hud.fatal('描画接続が失われました。ページを再読み込みしてください。');
       });
+      this.world = new VoxelWorld(this.renderer.scene);
     } catch (error) {
       this.hud.fatal(error instanceof Error ? error.message : '描画を初期化できません。');
       this.hud.dispose();
@@ -41,6 +51,10 @@ export class Game {
     this.input.onLockChange = locked => {
       this.clock.reset();
       this.player.sync();
+      this.breaker.reset();
+      this.lastHit = null;
+      this.world.setSelection(null);
+      this.hud.setInteraction('');
       this.lastTime = undefined;
       this.hud.setPlaying(locked);
     };
@@ -62,6 +76,7 @@ export class Game {
     this.player.look(dx, dy, this.settings.sensitivity);
     const alpha = this.input.locked ? this.clock.advance(delta, dt => this.player.update(dt, this.input)) : 1;
     this.player.render(this.renderer.camera, alpha, delta, this.settings, this.input.locked);
+    this.updateVoxelInteraction(delta);
     this.renderer.draw();
 
     this.statsTime += elapsed;
@@ -69,14 +84,17 @@ export class Game {
     if (this.statsTime >= 0.5) {
       const p = this.player.position;
       const info = this.renderer.gl.info;
+      const target = this.lastHit ? `${this.lastHit.x} / ${this.lastHit.y} / ${this.lastHit.z}` : 'none';
       this.hud.updateDebug([
-        'Scraft V3 / Phase 1',
+        'Scraft V3 / Phase 2',
         `FPS ${(this.statsFrames / Math.max(this.statsTime, 0.001)).toFixed(0)}`,
         `XYZ ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
         `Chunk XZ ${splitCoordinate(p.x).chunk} / ${splitCoordinate(p.z).chunk}`,
+        `Target ${target}`,
+        `Loaded chunks ${this.world.loadedChunkCount}`,
         `Triangles ${info.render.triangles} | Draw calls ${info.render.calls}`,
         `GPU resources ${info.memory.geometries} geometries / ${info.memory.textures} textures`,
-        'World: Phase 1 test floor | Seed/Biome/Loaded chunks: Phase 3',
+        'World: Phase 2 fixed test area | Terrain streaming/biomes/seed: Phase 3',
       ].join('\n'));
       this.statsTime = 0;
       this.statsFrames = 0;
@@ -85,9 +103,48 @@ export class Game {
     this.frame = requestAnimationFrame(this.tick);
   };
 
+  private updateVoxelInteraction(delta: number): void {
+    if (!this.input.locked) {
+      this.breaker.reset();
+      this.lastHit = null;
+      this.world.setSelection(null);
+      this.hud.setInteraction('');
+      return;
+    }
+
+    this.renderer.camera.getWorldDirection(this.lookDirection);
+    const hit = this.world.raycast(this.renderer.camera.position, this.lookDirection);
+    this.lastHit = hit;
+    const hardness = hit ? this.world.blocks.get(hit.blockId).hardness : 0;
+    const placePressed = this.input.consumeMousePress(2);
+    const update = this.breaker.update(delta, this.input.isMouseDown(0), hit, hardness);
+    this.world.setSelection(hit, update.progress);
+
+    if (hit) {
+      const block = this.world.blocks.get(hit.blockId);
+      const percent = this.input.isMouseDown(0) ? ` / 破壊 ${Math.round(update.progress * 100)}%` : '';
+      this.hud.setInteraction(`${block.name}${percent}`);
+    } else {
+      this.hud.setInteraction('');
+    }
+
+    if (update.completed && hit) {
+      if (this.world.breakBlock(hit)) this.hud.showMessage(`${this.world.blocks.get(hit.blockId).name} を破壊しました`);
+      this.lastHit = null;
+      this.world.setSelection(null);
+      return;
+    }
+
+    if (placePressed && hit) {
+      const placed = this.world.placeBlock(hit, BlockIds.DIRT, this.player.getBounds());
+      if (!placed) this.hud.showMessage('その位置にはブロックを設置できません。');
+    }
+  }
+
   private readonly handleVisibility = (): void => {
     if (document.hidden) this.input.pause();
     this.clock.reset();
+    this.breaker.reset();
     this.lastTime = undefined;
   };
 
@@ -97,6 +154,7 @@ export class Game {
     cancelAnimationFrame(this.frame);
     document.removeEventListener('visibilitychange', this.handleVisibility);
     this.input.dispose();
+    this.world.dispose();
     this.hud.dispose();
     this.renderer.dispose();
   }

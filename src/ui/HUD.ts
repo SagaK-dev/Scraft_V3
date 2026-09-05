@@ -7,6 +7,7 @@ export class HUD {
   private readonly panel: HTMLDivElement;
   private readonly debug: HTMLPreElement;
   private readonly message: HTMLDivElement;
+  private readonly interaction: HTMLDivElement;
   private startHandler?: () => void;
   private debugVisible = false;
 
@@ -18,14 +19,15 @@ export class HUD {
     root.innerHTML = `
       <canvas class="game-canvas" aria-label="Scraft V3 game view"></canvas>
       <div class="crosshair" aria-hidden="true"></div>
+      <div class="interaction-status" aria-live="polite"></div>
       <pre class="debug-panel" hidden></pre>
       <div class="message" hidden></div>
       <div class="overlay">
         <section class="menu-panel" aria-label="Game menu">
           <h1>Scraft V3</h1>
-          <p class="subtitle">Phase 1 — Web voxel engine foundation</p>
+          <p class="subtitle">Phase 2 — Voxel chunks and interaction</p>
           <button class="primary" data-action="start">ゲーム開始 / 再開</button>
-          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / F3 デバッグ / Esc 一時停止</div>
+          <div class="controls">WASD 移動 / Space ジャンプ / Ctrl ダッシュ / 左長押し 破壊 / 右クリック Dirt設置 / F3 デバッグ / Esc 一時停止</div>
           <details>
             <summary>設定</summary>
             <label>FOV <output data-output="fov"></output><input data-setting="fov" type="range" min="50" max="110" step="1"></label>
@@ -42,6 +44,7 @@ export class HUD {
     this.panel = required(root.querySelector<HTMLDivElement>('.menu-panel'));
     this.debug = required(root.querySelector<HTMLPreElement>('.debug-panel'));
     this.message = required(root.querySelector<HTMLDivElement>('.message'));
+    this.interaction = required(root.querySelector<HTMLDivElement>('.interaction-status'));
 
     const startButton = required(this.panel.querySelector<HTMLButtonElement>('[data-action="start"]'));
     startButton.addEventListener('click', () => this.startHandler?.());
@@ -59,6 +62,11 @@ export class HUD {
 
   setPlaying(playing: boolean): void {
     this.overlay.hidden = playing;
+  }
+
+  setInteraction(text: string): void {
+    this.interaction.textContent = text;
+    this.interaction.hidden = text.length === 0;
   }
 
   toggleDebug(): void {

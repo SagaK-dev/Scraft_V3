@@ -5,8 +5,6 @@ export class Renderer {
   readonly camera = new THREE.PerspectiveCamera(75, 1, 0.05, 1000);
   readonly gl: THREE.WebGLRenderer;
   private readonly resizeObserver: ResizeObserver;
-  private readonly disposableGeometries: THREE.BufferGeometry[] = [];
-  private readonly disposableMaterials: THREE.Material[] = [];
 
   constructor(canvas: HTMLCanvasElement, onContextLost: () => void) {
     const probe = canvas.getContext('webgl2', { antialias: true, powerPreference: 'high-performance' });
@@ -23,7 +21,6 @@ export class Renderer {
     sun.position.set(20, 35, 12);
     this.scene.add(sun);
 
-    this.createPhaseOneGround();
     canvas.addEventListener('webglcontextlost', event => {
       event.preventDefault();
       onContextLost();
@@ -46,8 +43,6 @@ export class Renderer {
 
   dispose(): void {
     this.resizeObserver.disconnect();
-    for (const geometry of this.disposableGeometries) geometry.dispose();
-    for (const material of this.disposableMaterials) material.dispose();
     this.gl.dispose();
   }
 
@@ -59,19 +54,4 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
     this.gl.setSize(width, height, false);
   };
-
-  private createPhaseOneGround(): void {
-    const geometry = new THREE.PlaneGeometry(96, 96);
-    const material = new THREE.MeshLambertMaterial({ color: 0x5c8f4a });
-    const ground = new THREE.Mesh(geometry, material);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    this.scene.add(ground);
-    this.disposableGeometries.push(geometry);
-    this.disposableMaterials.push(material);
-
-    const grid = new THREE.GridHelper(96, 96, 0x29402a, 0x486548);
-    grid.position.y = 0.003;
-    this.scene.add(grid);
-  }
 }
